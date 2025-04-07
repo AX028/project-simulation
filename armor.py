@@ -1,7 +1,7 @@
 # Base Armor class
 class Armor:
     def __init__(self, name, current_durability, max_durability, defense_type,
-                 defense, rarity, reforge, armor_type, intimidation):
+                 defense, rarity, reforge: int, armor_type, intimidation): # ? reforge noted to be a string
         self.name = name
         self.current_durability = current_durability
         self.max_durability = max_durability
