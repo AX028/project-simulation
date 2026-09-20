@@ -61,6 +61,7 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
+from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .physiology import (
     Container,
     Injury,
@@ -69,7 +70,6 @@ from .physiology import (
     PhysicalItem,
     Physiology,
 )
-from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .planning import Plan, PlanAction, Planner, WorldFact
 from .rumors import RumorDelivery, RumorNetwork, SocialLink
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
