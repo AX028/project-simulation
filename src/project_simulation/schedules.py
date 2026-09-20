@@ -69,14 +69,28 @@ class RoutineSchedule:
             return world_hour + 24.0
         return min(candidates)
 
+    @staticmethod
+    def _segments(block: RoutineBlock) -> tuple[tuple[float, float], ...]:
+        if block.start_hour == block.end_hour:
+            return ((0.0, 24.0),)
+        if block.start_hour < block.end_hour:
+            return ((block.start_hour, block.end_hour),)
+        return ((block.start_hour, 24.0), (0.0, block.end_hour))
+
+    @classmethod
+    def _overlap(cls, first: RoutineBlock, second: RoutineBlock) -> bool:
+        return any(
+            max(first_start, second_start) < min(first_end, second_end)
+            for first_start, first_end in cls._segments(first)
+            for second_start, second_end in cls._segments(second)
+        )
+
     def _validate_no_overlaps(self) -> None:
-        sample_points = [index / 4.0 for index in range(96)]
-        for hour in sample_points:
-            active = [block for block in self.blocks if block.contains(hour)]
-            if len(active) <= 1:
-                continue
-            priorities = [block.priority for block in active]
-            if len(priorities) != len(set(priorities)):
-                raise ValueError(
-                    "overlapping routine blocks require distinct priorities"
-                )
+        for index, first in enumerate(self.blocks):
+            for second in self.blocks[index + 1 :]:
+                if first.priority != second.priority:
+                    continue
+                if self._overlap(first, second):
+                    raise ValueError(
+                        "overlapping routine blocks require distinct priorities"
+                    )
