@@ -125,7 +125,11 @@ class SpatialCombatResolver:
             StrikeType.BLUNT: 0.82,
         }[attacker.weapon.strike_type]
 
-        raw_damage = sqrt(max(0.0, impact_energy)) * attacker.weapon.edge_factor * strike_factor
+        raw_damage = (
+            sqrt(max(0.0, impact_energy))
+            * attacker.weapon.edge_factor
+            * strike_factor
+        )
         raw_damage += attacker.actor.stats.strength * 0.08
         protection = target.actor.stats.armor + self._armor_protection(target.actor, part)
         damage = max(1, round(raw_damage * body.damage_multiplier - protection))
