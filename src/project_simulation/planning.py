@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from heapq import heappop, heappush
 from itertools import count
-from typing import Iterable
+from collections.abc import Iterable
 
 
 @dataclass(frozen=True, slots=True)
