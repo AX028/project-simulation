@@ -9,7 +9,6 @@ from project_simulation import (
     transfer,
 )
 
-
 GRAIN = Commodity("grain", "Grain", base_price=2.0, mass_kg=1.0)
 FLOUR = Commodity("flour", "Flour", base_price=4.0, mass_kg=1.0)
 
