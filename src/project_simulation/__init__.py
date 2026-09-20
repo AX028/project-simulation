@@ -69,6 +69,7 @@ from .physiology import (
     PhysicalItem,
     Physiology,
 )
+from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .planning import Plan, PlanAction, Planner, WorldFact
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
 from .simulation import (
@@ -101,6 +102,9 @@ __all__ = [
     "CLASS_DEFINITIONS",
     "ENEMY_DEFINITIONS",
     "Action",
+    "NPCController",
+    "GoalRequest",
+    "AgentDirective",
     "Actor",
     "Belief",
     "BodyPart",
