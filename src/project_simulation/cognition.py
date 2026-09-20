@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import exp
-from collections.abc import Iterable
 
 
 @dataclass(slots=True)
