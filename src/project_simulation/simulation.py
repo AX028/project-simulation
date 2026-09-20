@@ -9,6 +9,9 @@ from heapq import heappop, heappush
 from itertools import count
 
 
+EventValue = str | int | float | bool
+
+
 class SimulationLOD(IntEnum):
     IMMEDIATE = 0
     LOCAL = 1
@@ -22,7 +25,7 @@ class ScheduledEvent:
     at: float
     sequence: int
     kind: str = field(compare=False)
-    payload: dict[str, object] = field(compare=False, default_factory=dict)
+    payload: dict[str, EventValue] = field(compare=False, default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -87,7 +90,7 @@ class SimulationKernel:
     def register_handler(self, kind: str, handler: EventHandler) -> None:
         self._handlers[kind] = handler
 
-    def schedule(self, at: float, kind: str, **payload: object) -> ScheduledEvent:
+    def schedule(self, at: float, kind: str, **payload: EventValue) -> ScheduledEvent:
         event = ScheduledEvent(at, next(self._counter), kind, dict(payload))
         heappush(self._events, event)
         return event
