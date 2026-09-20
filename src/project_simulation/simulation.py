@@ -8,7 +8,6 @@ from enum import IntEnum
 from heapq import heappop, heappush
 from itertools import count
 
-
 EventValue = str | int | float | bool
 
 
