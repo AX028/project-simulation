@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from heapq import heappop, heappush
 from itertools import count
-from typing import Callable
+from collections.abc import Callable
 
 
 class SimulationLOD(IntEnum):
@@ -138,7 +138,8 @@ class SimulationKernel:
         settlement.food_units += produced - consumed
         if settlement.food_units < 0:
             shortage = min(1.0, abs(settlement.food_units) / max(1.0, consumed))
-            settlement.population = max(0, settlement.population - round(shortage * 0.003 * settlement.population))
+            population_loss = round(shortage * 0.003 * settlement.population)
+            settlement.population = max(0, settlement.population - population_loss)
             settlement.wealth = max(0.0, settlement.wealth * (1.0 - shortage * 0.015))
             settlement.food_units = 0.0
         settlement.recompute_prices()
@@ -148,7 +149,8 @@ class SimulationKernel:
         attacker = world.factions[str(event.payload["attacker"])]
         defender = world.factions[str(event.payload["defender"])]
         scale = max(0.01, min(1.0, float(event.payload.get("scale", 0.1))))
-        attack_strength = attacker.military_power * (0.75 + attacker.wealth / max(1.0, attacker.members) * 0.01)
+        wealth_factor = attacker.wealth / max(1.0, attacker.members) * 0.01
+        attack_strength = attacker.military_power * (0.75 + wealth_factor)
         defense_strength = defender.military_power * 1.05
         total = max(1.0, attack_strength + defense_strength)
         attacker_loss = scale * defender.members * defense_strength / total * 0.08
