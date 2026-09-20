@@ -193,12 +193,3 @@ class SpatialCombatResolver:
             manipulation_penalty=manipulation,
             infection_risk=severity * 0.08,
         )
-
-    @property
-    def _current_strike_type(self) -> StrikeType:
-        # Set temporarily by resolve_attack through the active weapon.
-        return self.__dict__.get("_strike_type", StrikeType.CUT)
-
-    @_current_strike_type.setter
-    def _current_strike_type(self, value: StrikeType) -> None:
-        self.__dict__["_strike_type"] = value
