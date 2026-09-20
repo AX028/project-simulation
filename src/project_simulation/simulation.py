@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
 from heapq import heappop, heappush
 from itertools import count
-from collections.abc import Callable
 
 
 class SimulationLOD(IntEnum):
