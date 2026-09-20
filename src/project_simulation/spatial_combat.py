@@ -132,7 +132,7 @@ class SpatialCombatResolver:
         body.current_hp = max(0, body.current_hp - damage)
 
         severity = min(1.0, damage / max(1.0, body.max_hp))
-        injury = self._injury_for(part, severity)
+        injury = self._injury_for(part, severity, attacker.weapon.strike_type)
         target.world_actor.physiology.add_injury(injury)
 
         return SpatialAttackResult(
@@ -163,12 +163,13 @@ class SpatialCombatResolver:
             return armor.protection
         return 0
 
-    def _injury_for(self, part: BodyPart, severity: float) -> Injury:
+    @staticmethod
+    def _injury_for(part: BodyPart, severity: float, strike_type: StrikeType) -> Injury:
         injury_type = {
             StrikeType.CUT: InjuryType.LACERATION,
             StrikeType.THRUST: InjuryType.PUNCTURE,
             StrikeType.BLUNT: InjuryType.BLUNT,
-        }[self._current_strike_type]
+        }[strike_type]
         bleeding_factor = {
             InjuryType.LACERATION: 14.0,
             InjuryType.PUNCTURE: 18.0,
