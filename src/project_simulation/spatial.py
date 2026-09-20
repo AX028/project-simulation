@@ -13,27 +13,27 @@ class Vec3:
     y: float
     z: float = 0.0
 
-    def __add__(self, other: "Vec3") -> "Vec3":
+    def __add__(self, other: Vec3) -> Vec3:
         return Vec3(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __sub__(self, other: "Vec3") -> "Vec3":
+    def __sub__(self, other: Vec3) -> Vec3:
         return Vec3(self.x - other.x, self.y - other.y, self.z - other.z)
 
-    def scale(self, value: float) -> "Vec3":
+    def scale(self, value: float) -> Vec3:
         return Vec3(self.x * value, self.y * value, self.z * value)
 
     @property
     def magnitude(self) -> float:
         return sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
 
-    def normalized(self) -> "Vec3":
+    def normalized(self) -> Vec3:
         length = self.magnitude
         return self if length == 0 else self.scale(1.0 / length)
 
-    def distance_to(self, other: "Vec3") -> float:
+    def distance_to(self, other: Vec3) -> float:
         return (other - self).magnitude
 
-    def dot(self, other: "Vec3") -> float:
+    def dot(self, other: Vec3) -> float:
         return self.x * other.x + self.y * other.y + self.z * other.z
 
 
@@ -127,7 +127,7 @@ def _segment_aabb_occluded(start: Vec3, end: Vec3, obstacle: SpatialEntity) -> b
 def observe(
     observer: SpatialEntity,
     target: SpatialEntity,
-    profile: VisionProfile = VisionProfile(),
+    profile: VisionProfile | None = None,
     *,
     illumination: float = 1.0,
     contrast: float = 1.0,
@@ -135,6 +135,8 @@ def observe(
 ) -> Observation | None:
     if not target.visible:
         return None
+    if profile is None:
+        profile = VisionProfile()
 
     distance = observer.position.distance_to(target.position)
     if distance > profile.max_distance_m:
