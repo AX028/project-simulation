@@ -148,7 +148,7 @@ class Loadout:
     @property
     def fatigue_multiplier(self) -> float:
         ratio = self.load_ratio
-        return 1.0 + ratio**1.7
+        return float(1.0 + ratio**1.7)
 
     def retrieval_time(self, item_id: str) -> float:
         for item in self.carried_loose:
