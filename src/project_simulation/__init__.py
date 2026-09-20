@@ -22,6 +22,15 @@ from .cognition import (
     Mind,
     Relationship,
 )
+from .demographics import (
+    MigrationResult,
+    employed_population,
+    fill_occupation,
+    migrate,
+    migration_pressure,
+    settlement_attractiveness,
+    unemployment_ratio,
+)
 from .economy import (
     Commodity,
     Market,
@@ -97,6 +106,13 @@ __all__ = [
     "BodyPart",
     "Bounds",
     "CandidateAction",
+    "unemployment_ratio",
+    "settlement_attractiveness",
+    "migration_pressure",
+    "migrate",
+    "fill_occupation",
+    "employed_population",
+    "MigrationResult",
     "TradeRoute",
     "TradeResult",
     "ProductionResult",
