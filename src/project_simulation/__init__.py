@@ -71,6 +71,7 @@ from .physiology import (
 )
 from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .planning import Plan, PlanAction, Planner, WorldFact
+from .rumors import RumorDelivery, RumorNetwork, SocialLink
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
 from .simulation import (
     FactionState,
@@ -147,6 +148,9 @@ __all__ = [
     "Physiology",
     "PlayerCharacter",
     "Relationship",
+    "SocialLink",
+    "RumorNetwork",
+    "RumorDelivery",
     "RoutineBlock",
     "RoutineDecision",
     "RoutineSchedule",
