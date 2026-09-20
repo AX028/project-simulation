@@ -22,6 +22,16 @@ from .cognition import (
     Mind,
     Relationship,
 )
+from .economy import (
+    Commodity,
+    Market,
+    ProductionRecipe,
+    ProductionResult,
+    TradeResult,
+    TradeRoute,
+    run_production,
+    transfer,
+)
 from .information import (
     Claim,
     Transmission,
@@ -87,6 +97,12 @@ __all__ = [
     "BodyPart",
     "Bounds",
     "CandidateAction",
+    "TradeRoute",
+    "TradeResult",
+    "ProductionResult",
+    "ProductionRecipe",
+    "Market",
+    "Commodity",
     "Claim",
     "CombatEngine",
     "CombatMode",
@@ -143,8 +159,10 @@ __all__ = [
     "observe",
     "render_observations",
     "run_encounter",
+    "run_production",
     "save_game",
     "tactical_map",
+    "transfer",
     "transmission_confidence",
     "transmit_claim",
 ]
