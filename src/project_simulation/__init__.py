@@ -22,7 +22,13 @@ from .cognition import (
     Mind,
     Relationship,
 )
-from .information import Claim, Transmission, broadcast_claim, transmit_claim
+from .information import (
+    Claim,
+    Transmission,
+    broadcast_claim,
+    transmission_confidence,
+    transmit_claim,
+)
 from .models import (
     Action,
     Actor,
@@ -59,6 +65,13 @@ from .spatial import (
     Vec3,
     VisionProfile,
     observe,
+)
+from .spatial_combat import (
+    SpatialAttackResult,
+    SpatialCombatant,
+    SpatialCombatResolver,
+    StrikeType,
+    WeaponPhysics,
 )
 from .textui import narrative_view, render_observations, tactical_map
 from .worldstate import WorldActor
@@ -99,11 +112,16 @@ __all__ = [
     "SettlementState",
     "SimulationKernel",
     "SimulationLOD",
+    "SpatialAttackResult",
+    "SpatialCombatant",
+    "SpatialCombatResolver",
     "SpatialEntity",
+    "StrikeType",
     "Transmission",
     "UtilityDecisionPolicy",
     "Vec3",
     "VisionProfile",
+    "WeaponPhysics",
     "WorldActor",
     "WorldConfig",
     "WorldFact",
@@ -121,6 +139,7 @@ __all__ = [
     "run_encounter",
     "save_game",
     "tactical_map",
+    "transmission_confidence",
     "transmit_claim",
 ]
 
