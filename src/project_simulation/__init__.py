@@ -22,6 +22,7 @@ from .cognition import (
     Mind,
     Relationship,
 )
+from .information import Claim, Transmission, broadcast_claim, transmit_claim
 from .models import (
     Action,
     Actor,
@@ -35,7 +36,6 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
-from .information import Claim, Transmission, broadcast_claim, transmit_claim
 from .physiology import (
     Container,
     Injury,
