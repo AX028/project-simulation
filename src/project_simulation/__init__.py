@@ -35,6 +35,7 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
+from .information import Claim, Transmission, broadcast_claim, transmit_claim
 from .physiology import (
     Container,
     Injury,
@@ -43,6 +44,7 @@ from .physiology import (
     PhysicalItem,
     Physiology,
 )
+from .planning import Plan, PlanAction, Planner, WorldFact
 from .simulation import (
     FactionState,
     SettlementState,
@@ -59,6 +61,7 @@ from .spatial import (
     observe,
 )
 from .textui import narrative_view, render_observations, tactical_map
+from .worldstate import WorldActor
 
 __all__ = [
     "CLASS_DEFINITIONS",
@@ -69,6 +72,7 @@ __all__ = [
     "BodyPart",
     "Bounds",
     "CandidateAction",
+    "Claim",
     "CombatEngine",
     "CombatMode",
     "Container",
@@ -85,6 +89,9 @@ __all__ = [
     "Memory",
     "Mind",
     "Observation",
+    "Plan",
+    "PlanAction",
+    "Planner",
     "PhysicalItem",
     "Physiology",
     "PlayerCharacter",
@@ -93,13 +100,17 @@ __all__ = [
     "SimulationKernel",
     "SimulationLOD",
     "SpatialEntity",
+    "Transmission",
     "UtilityDecisionPolicy",
     "Vec3",
     "VisionProfile",
+    "WorldActor",
     "WorldConfig",
+    "WorldFact",
     "WorldMap",
     "WorldState",
     "WorldStore",
+    "broadcast_claim",
     "create_character",
     "create_enemy",
     "generate_world",
@@ -110,6 +121,7 @@ __all__ = [
     "run_encounter",
     "save_game",
     "tactical_map",
+    "transmit_claim",
 ]
 
 __version__ = "1.1.0"
