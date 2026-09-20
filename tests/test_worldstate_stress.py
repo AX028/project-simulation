@@ -50,7 +50,7 @@ def test_memory_accessibility_never_increases_with_age() -> None:
         created_at=0.0,
     )
     values = [memory.accessibility(float(hour)) for hour in range(101)]
-    assert all(later <= earlier for earlier, later in zip(values, values[1:]))
+    assert all(later <= earlier for earlier, later in zip(values, values[1:], strict=True))
 
 
 def test_planner_is_deterministic_over_repeated_runs() -> None:
@@ -110,7 +110,7 @@ def test_encumbrance_penalty_increases_monotonically() -> None:
             for index in range(count)
         ]
         multipliers.append(Loadout(70.0, carried_loose=items).fatigue_multiplier)
-    assert all(later >= earlier for earlier, later in zip(multipliers, multipliers[1:]))
+    assert all(later >= earlier for earlier, later in zip(multipliers, multipliers[1:], strict=True))
 
 
 def test_physiology_remains_within_performance_bounds_under_stress() -> None:
