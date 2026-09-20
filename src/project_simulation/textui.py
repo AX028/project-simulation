@@ -56,7 +56,10 @@ def narrative_view(
             distance = "some distance away"
         else:
             distance = "far away"
-        sentences.append(f"{item.description.capitalize()} is {distance} to your {item.bearing.lower()}.")
+        sentences.append(
+            f"{item.description.capitalize()} is {distance} "
+            f"to your {item.bearing.lower()}."
+        )
     return " ".join(sentences)
 
 
