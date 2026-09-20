@@ -56,7 +56,10 @@ class Physiology:
     def performance_modifier(self) -> float:
         injury_penalty = min(
             0.65,
-            sum(injury.severity * 0.12 + injury.mobility_penalty * 0.08 for injury in self.injuries),
+            sum(
+                injury.severity * 0.12 + injury.mobility_penalty * 0.08
+                for injury in self.injuries
+            ),
         )
         blood_penalty = min(0.7, self.blood_loss_ratio * 1.8)
         fatigue_penalty = min(0.55, self.fatigue / 180.0)
