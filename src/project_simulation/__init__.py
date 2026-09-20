@@ -51,6 +51,7 @@ from .physiology import (
     Physiology,
 )
 from .planning import Plan, PlanAction, Planner, WorldFact
+from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
 from .simulation import (
     FactionState,
     SettlementState,
@@ -75,6 +76,7 @@ from .spatial_combat import (
 )
 from .textui import narrative_view, render_observations, tactical_map
 from .worldstate import WorldActor
+from .worldstate_persistence import WorldStateStore
 
 __all__ = [
     "CLASS_DEFINITIONS",
@@ -109,6 +111,9 @@ __all__ = [
     "Physiology",
     "PlayerCharacter",
     "Relationship",
+    "RoutineBlock",
+    "RoutineDecision",
+    "RoutineSchedule",
     "SettlementState",
     "SimulationKernel",
     "SimulationLOD",
@@ -127,6 +132,7 @@ __all__ = [
     "WorldFact",
     "WorldMap",
     "WorldState",
+    "WorldStateStore",
     "WorldStore",
     "broadcast_claim",
     "create_character",
