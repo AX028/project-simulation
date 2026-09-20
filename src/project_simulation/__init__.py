@@ -13,6 +13,15 @@ from .api import (
     run_encounter,
     save_game,
 )
+from .cognition import (
+    Belief,
+    CandidateAction,
+    EmotionState,
+    Goal,
+    Memory,
+    Mind,
+    Relationship,
+)
 from .models import (
     Action,
     Actor,
@@ -26,30 +35,81 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
+from .physiology import (
+    Container,
+    Injury,
+    InjuryType,
+    Loadout,
+    PhysicalItem,
+    Physiology,
+)
+from .simulation import (
+    FactionState,
+    SettlementState,
+    SimulationKernel,
+    SimulationLOD,
+    WorldState,
+)
+from .spatial import (
+    Bounds,
+    Observation,
+    SpatialEntity,
+    Vec3,
+    VisionProfile,
+    observe,
+)
+from .textui import narrative_view, render_observations, tactical_map
 
 __all__ = [
     "CLASS_DEFINITIONS",
     "ENEMY_DEFINITIONS",
     "Action",
     "Actor",
+    "Belief",
     "BodyPart",
+    "Bounds",
+    "CandidateAction",
     "CombatEngine",
     "CombatMode",
+    "Container",
     "DamageType",
+    "EmotionState",
     "EncounterResult",
     "EncounterState",
+    "FactionState",
     "GameState",
+    "Goal",
+    "Injury",
+    "InjuryType",
+    "Loadout",
+    "Memory",
+    "Mind",
+    "Observation",
+    "PhysicalItem",
+    "Physiology",
     "PlayerCharacter",
+    "Relationship",
+    "SettlementState",
+    "SimulationKernel",
+    "SimulationLOD",
+    "SpatialEntity",
     "UtilityDecisionPolicy",
+    "Vec3",
+    "VisionProfile",
     "WorldConfig",
     "WorldMap",
+    "WorldState",
     "WorldStore",
     "create_character",
     "create_enemy",
     "generate_world",
     "load_game",
+    "narrative_view",
+    "observe",
+    "render_observations",
     "run_encounter",
     "save_game",
+    "tactical_map",
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
