@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from math import acos, degrees, sqrt
-from typing import Iterable
+from collections.abc import Iterable
 
 
 @dataclass(frozen=True, slots=True)
