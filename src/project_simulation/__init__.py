@@ -66,6 +66,7 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
+from .navigation import MovementResult, SweepHit, move_actor_with_collisions, sweep_entity
 from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .physiology import (
     Container,
@@ -191,6 +192,10 @@ __all__ = [
     "Loadout",
     "Memory",
     "Mind",
+    "sweep_entity",
+    "move_actor_with_collisions",
+    "SweepHit",
+    "MovementResult",
     "Observation",
     "SettlementEconomicProfile",
     "SettlementDynamics",
