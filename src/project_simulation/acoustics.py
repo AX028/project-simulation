@@ -113,9 +113,12 @@ def hear_sound(
     profile: HearingProfile | None = None,
     *,
     obstacles: Iterable[SpatialEntity] = (),
+    ambient_noise_db: float = 0.0,
 ) -> HeardSound | None:
     if profile is None:
         profile = HearingProfile()
+    if ambient_noise_db < 0:
+        raise ValueError("ambient noise may not be negative")
     listener_point = listener.position + Vec3(
         0.0,
         0.0,
@@ -138,10 +141,11 @@ def hear_sound(
         - occluders * profile.occlusion_loss_db
         + profile.sensitivity_db
     )
-    if perceived < profile.threshold_db:
+    effective_threshold = max(profile.threshold_db, ambient_noise_db)
+    if perceived < effective_threshold:
         return None
 
-    margin = perceived - profile.threshold_db
+    margin = perceived - effective_threshold
     clarity = max(0.0, min(1.0, margin / 40.0))
     direction = (event.position - listener_point).normalized()
     return HeardSound(
@@ -160,6 +164,7 @@ def propagate_sound(
     listeners: Iterable[tuple[SpatialEntity, HearingProfile]],
     *,
     obstacles: Iterable[SpatialEntity] = (),
+    ambient_noise_db: float = 0.0,
 ) -> tuple[HeardSound, ...]:
     heard: list[HeardSound] = []
     obstacle_list = tuple(obstacles)
@@ -169,6 +174,7 @@ def propagate_sound(
             listener,
             profile,
             obstacles=obstacle_list,
+            ambient_noise_db=ambient_noise_db,
         )
         if result is not None:
             heard.append(result)
