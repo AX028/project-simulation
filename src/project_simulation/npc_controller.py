@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .planning import FactValue, Plan, PlanAction, Planner, WorldFact
-from .validation import nonnegative_number
 from .schedules import RoutineDecision, RoutineSchedule
+from .validation import nonnegative_number
 
 
 @dataclass(frozen=True, slots=True)
