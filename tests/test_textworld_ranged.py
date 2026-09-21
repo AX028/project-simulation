@@ -7,6 +7,7 @@ from project_simulation import (
     Physiology,
     SpatialCombatant,
     SpatialEntity,
+    TextWorldSession,
     Vec3,
     WeaponPhysics,
     WorldActor,
@@ -16,7 +17,7 @@ from project_simulation import (
 )
 
 
-def _wolf_id(session) -> str:
+def _wolf_id(session: TextWorldSession) -> str:
     return next(
         actor_id
         for actor_id, actor in session.actors.items()
