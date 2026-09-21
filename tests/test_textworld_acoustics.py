@@ -1,5 +1,3 @@
-import pytest
-
 from project_simulation import (
     Bounds,
     HearingProfile,
