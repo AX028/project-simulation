@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .planning import Plan, PlanAction, Planner, WorldFact
+from .planning import FactValue, Plan, PlanAction, Planner, WorldFact
+from .validation import nonnegative_number
 from .schedules import RoutineDecision, RoutineSchedule
 
 
@@ -15,8 +16,7 @@ class GoalRequest:
     priority: float
 
     def __post_init__(self) -> None:
-        if self.priority < 0:
-            raise ValueError("goal priority may not be negative")
+        nonnegative_number(self.priority, "goal priority")
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +32,7 @@ class AgentDirective:
 class NPCController:
     schedule: RoutineSchedule
     actions: tuple[PlanAction, ...] = ()
-    facts: dict[str, object] = field(default_factory=dict)
+    facts: dict[str, FactValue] = field(default_factory=dict)
     planner: Planner = field(default_factory=Planner)
 
     def choose_directive(
