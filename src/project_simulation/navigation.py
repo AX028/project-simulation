@@ -165,6 +165,8 @@ def move_actor_with_collisions(
     doors: Iterable[Door] = (),
     exertion: float = 0.35,
     clearance_m: float = 0.002,
+    ambient_c: float = 20.0,
+    speed_multiplier: float = 1.0,
 ) -> MovementResult:
     if seconds < 0:
         raise ValueError("seconds may not be negative")
@@ -172,12 +174,17 @@ def move_actor_with_collisions(
         raise ValueError("clearance_m may not be negative")
 
     delta = destination - actor.spatial.position
+    speed_multiplier = max(0.0, speed_multiplier)
     requested = min(
         delta.magnitude,
-        actor.effective_speed() * seconds,
+        actor.effective_speed() * speed_multiplier * seconds,
     )
     if requested <= _EPSILON:
-        actor.physiology.tick(seconds / 60.0, exertion=exertion)
+        actor.physiology.tick(
+            seconds / 60.0,
+            exertion=exertion,
+            ambient_c=ambient_c,
+        )
         return MovementResult(
             requested,
             0.0,
