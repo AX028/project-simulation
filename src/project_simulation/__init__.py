@@ -97,6 +97,13 @@ from .spatial import (
     VisionProfile,
     observe,
 )
+from .spatial_combat import (
+    SpatialAttackResult,
+    SpatialCombatant,
+    SpatialCombatResolver,
+    StrikeType,
+    WeaponPhysics,
+)
 from .spatial_encounter import (
     SpatialAction,
     SpatialEncounterEngine,
@@ -104,13 +111,6 @@ from .spatial_encounter import (
     SpatialIntent,
     SpatialTurnEvent,
     SpatialTurnResult,
-)
-from .spatial_combat import (
-    SpatialAttackResult,
-    SpatialCombatant,
-    SpatialCombatResolver,
-    StrikeType,
-    WeaponPhysics,
 )
 from .textui import narrative_view, render_observations, tactical_map
 from .worldstate import WorldActor
