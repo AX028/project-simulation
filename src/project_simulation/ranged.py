@@ -13,7 +13,7 @@ from .projectiles import (
     ProjectileSpec,
     launch_velocity,
 )
-from .spatial import Vec3
+from .spatial import SpatialEntity, Vec3
 
 
 @dataclass(slots=True)
@@ -63,6 +63,35 @@ class RangedImpactResult:
     kinetic_energy_j: float
     injury: Injury
     text: str
+
+
+def aim_point_for_body_part(
+    entity: SpatialEntity,
+    part: BodyPart,
+) -> Vec3:
+    """Return a deterministic approximate anatomical aim point."""
+    height_fraction = {
+        BodyPart.HEAD: 0.90,
+        BodyPart.TORSO: 0.60,
+        BodyPart.LEFT_ARM: 0.62,
+        BodyPart.RIGHT_ARM: 0.62,
+        BodyPart.LEFT_LEG: 0.25,
+        BodyPart.RIGHT_LEG: 0.25,
+    }[part]
+    side_sign = {
+        BodyPart.LEFT_ARM: -1.0,
+        BodyPart.RIGHT_ARM: 1.0,
+        BodyPart.LEFT_LEG: -0.45,
+        BodyPart.RIGHT_LEG: 0.45,
+    }.get(part, 0.0)
+    forward = entity.facing.normalized()
+    side = Vec3(-forward.y, forward.x, 0.0)
+    lateral = side.scale(entity.bounds.half_width * side_sign)
+    return (
+        entity.position
+        + lateral
+        + Vec3(0.0, 0.0, entity.bounds.height * height_fraction)
+    )
 
 
 def resolve_projectile_impact(
