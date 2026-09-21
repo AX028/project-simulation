@@ -170,6 +170,7 @@ class AmbientNPCSimulation:
                 agent.actor.physiology.tick(
                     segment / 60.0,
                     exertion=0.05,
+                    ambient_c=ambient_c,
                 )
 
             events.append(
