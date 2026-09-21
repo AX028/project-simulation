@@ -97,6 +97,14 @@ from .spatial import (
     VisionProfile,
     observe,
 )
+from .spatial_encounter import (
+    SpatialAction,
+    SpatialEncounterEngine,
+    SpatialEncounterState,
+    SpatialIntent,
+    SpatialTurnEvent,
+    SpatialTurnResult,
+)
 from .spatial_combat import (
     SpatialAttackResult,
     SpatialCombatant,
@@ -179,6 +187,12 @@ __all__ = [
     "SimulationKernel",
     "SimulationLOD",
     "SpatialAttackResult",
+    "SpatialTurnResult",
+    "SpatialTurnEvent",
+    "SpatialIntent",
+    "SpatialEncounterState",
+    "SpatialEncounterEngine",
+    "SpatialAction",
     "SpatialCombatant",
     "SpatialCombatResolver",
     "SpatialEntity",
