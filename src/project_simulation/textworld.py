@@ -7,8 +7,9 @@ import shlex
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from .cognition import Mind
+from .cognition import Belief, Mind
 from .content import create_character, create_enemy
+from .dialogue import converse
 from .models import BodyPart
 from .physiology import Loadout, PhysicalItem, Physiology
 from .simulation import SimulationKernel, WorldState
@@ -34,6 +35,7 @@ class CommandKind(StrEnum):
     TAKE = "take"
     DROP = "drop"
     INVENTORY = "inventory"
+    TALK = "talk"
     HELP = "help"
     QUIT = "quit"
 
@@ -105,6 +107,7 @@ class TextWorldSession:
             CommandKind.TAKE: self._take,
             CommandKind.DROP: self._drop,
             CommandKind.INVENTORY: self._inventory,
+            CommandKind.TALK: self._talk,
             CommandKind.HELP: self._help,
             CommandKind.QUIT: self._quit,
         }[command.kind]
@@ -332,12 +335,49 @@ class TextWorldSession:
             False,
         )
 
+    def _talk(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        if not 1 <= len(args) <= 2:
+            raise ValueError("usage: talk <target> [topic]")
+        target_id = self._resolve_actor(args[0])
+        if target_id == self.player_id:
+            raise ValueError("cannot talk to yourself")
+        target = self.actors[target_id]
+
+        distance = self.player.spatial.position.distance_to(target.spatial.position)
+        if distance > 3.0:
+            raise ValueError(
+                f"{target.spatial.name} is too far away to talk ({distance:.2f} m)"
+            )
+        observation = observe(
+            self.player.spatial,
+            target.spatial,
+            self.player.vision,
+            obstacles=self.entities,
+        )
+        if observation is None:
+            raise ValueError(f"you cannot currently perceive {target.spatial.name}")
+
+        topic = args[1] if len(args) == 2 else None
+        now = self.elapsed_seconds / 3600.0
+        result = converse(
+            speaker_id=target_id,
+            speaker_name=target.spatial.name,
+            speaker=target.mind,
+            listener_id=self.player_id,
+            listener=self.player.mind,
+            now=now,
+            topic=topic,
+        )
+        self._advance_clock(1.0)
+        return result.text, False
+
     def _help(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "help")
         return (
             "Commands: look, map, move <direction> [m], advance <target> [s], "
             "attack <target> [body_part], inspect <target>, wait [s], "
-            "status, take <item>, drop <item>, inventory, help, quit.",
+            "status, take <item>, drop <item>, inventory, "
+            "talk <target> [topic], help, quit.",
             False,
         )
 
@@ -436,6 +476,39 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         movement_speed_mps=1.8,
     )
 
+    villager_mind = Mind(
+        beliefs={
+            "bridge": Belief(
+                "east bridge",
+                "the east bridge is damaged and unsafe for carts",
+                0.85,
+                "direct_observation",
+                0.0,
+            ),
+            "wolves": Belief(
+                "wolves",
+                "wolves have been coming closer to the village at dusk",
+                0.75,
+                "neighbors",
+                0.0,
+            ),
+        }
+    )
+    villager_mind.relationship(player_actor.actor_id).trust = 20.0
+    villager_mind.relationship(player_actor.actor_id).respect = 10.0
+    villager_world = WorldActor(
+        SpatialEntity(
+            "mira",
+            "Mira",
+            Vec3(2.0, 2.0, 0.0),
+            facing=Vec3(-1.0, -1.0, 0.0),
+            tags=frozenset({"npc"}),
+        ),
+        villager_mind,
+        Physiology(62.0),
+        Loadout(62.0),
+    )
+
     sword = WeaponPhysics(
         "hunting sword",
         mass_kg=1.2,
@@ -482,6 +555,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         actors={
             player_actor.actor_id: player_world,
             wolf_actor.actor_id: wolf_world,
+            "mira": villager_world,
         },
         combatants={
             player_actor.actor_id: SpatialCombatant(
