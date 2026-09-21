@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from .cognition import Belief, EmotionState, Goal, Memory, Mind, Relationship
 from .physiology import Loadout, PhysicalItem, Physiology
 from .simulation import SimulationLOD
+from .skills import SkillSet
 from .spatial import Bounds, SpatialEntity, Vec3, VisionProfile
 from .worldstate import WorldActor
 
@@ -31,6 +32,7 @@ class AbstractActorState:
     carried_volume_l: float
     movement_speed_mps: float
     vision: VisionProfile
+    skills: SkillSet
     memories: tuple[Memory, ...]
     beliefs: tuple[tuple[str, Belief], ...]
     relationships: tuple[tuple[str, Relationship], ...]
@@ -118,6 +120,7 @@ def abstract_actor(
         carried_volume_l=sum(item.volume_l for item in carried_items),
         movement_speed_mps=actor.movement_speed_mps,
         vision=deepcopy(actor.vision),
+        skills=deepcopy(actor.skills),
         memories=tuple(deepcopy(memories)),
         beliefs=tuple((key, deepcopy(value)) for key, value in beliefs),
         relationships=tuple(
@@ -187,6 +190,7 @@ def restore_actor(state: AbstractActorState) -> WorldActor:
         mind=mind,
         physiology=deepcopy(state.physiology),
         loadout=loadout,
+        skills=deepcopy(state.skills),
         vision=deepcopy(state.vision),
         movement_speed_mps=state.movement_speed_mps,
     )
