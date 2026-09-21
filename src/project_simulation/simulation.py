@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import IntEnum
-from heapq import heappop, heappush
+from heapq import heapify, heappop, heappush
 from itertools import count
 
 EventValue = str | int | float | bool
@@ -106,6 +106,39 @@ class SimulationKernel:
                 continue
             handler(self.world, event)
         self.world.time_hours = target_hour
+
+    def pending_events(self) -> tuple[ScheduledEvent, ...]:
+        """Return an immutable, sorted copy of future scheduled events."""
+        return tuple(
+            ScheduledEvent(
+                event.at,
+                event.sequence,
+                event.kind,
+                dict(event.payload),
+            )
+            for event in sorted(self._events)
+        )
+
+    def replace_pending_events(self, events: Iterable[ScheduledEvent]) -> None:
+        """Replace the queue while preserving deterministic sequence ordering."""
+        restored = [
+            ScheduledEvent(
+                event.at,
+                event.sequence,
+                event.kind,
+                dict(event.payload),
+            )
+            for event in events
+        ]
+        if any(event.at < self.world.time_hours for event in restored):
+            raise ValueError("pending events may not occur before world time")
+        sequences = [event.sequence for event in restored]
+        if len(sequences) != len(set(sequences)):
+            raise ValueError("pending event sequence numbers must be unique")
+        self._events = restored
+        heapify(self._events)
+        next_sequence = max(sequences, default=-1) + 1
+        self._counter = count(next_sequence)
 
     def choose_lod(self, distance_m: float, important: bool = False) -> SimulationLOD:
         if distance_m <= 80:
