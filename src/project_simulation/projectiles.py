@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import inf, sqrt
-from collections.abc import Iterable
 
 from .spatial import Bounds, SpatialEntity, Vec3
 
@@ -180,11 +180,26 @@ class ProjectileSimulator:
         if not projectile.active:
             raise ValueError("projectile is inactive")
 
+        remaining_lifetime = (
+            projectile.spec.max_lifetime_s - projectile.age_s
+        )
+        if remaining_lifetime <= _EPSILON:
+            projectile.active = False
+            return ProjectileStep(
+                projectile.projectile_id,
+                projectile.position,
+                projectile.position,
+                0.0,
+                None,
+                False,
+            )
+        effective_dt = min(dt_s, remaining_lifetime)
+
         start = projectile.position
         velocity_start = projectile.velocity
         drag = max(
             0.0,
-            1.0 - projectile.spec.drag_coefficient * dt_s,
+            1.0 - projectile.spec.drag_coefficient * effective_dt,
         )
         velocity_horizontal = Vec3(
             velocity_start.x * drag,
@@ -194,14 +209,15 @@ class ProjectileSimulator:
         velocity_end = Vec3(
             velocity_horizontal.x,
             velocity_horizontal.y,
-            velocity_horizontal.z - projectile.spec.gravity_mps2 * dt_s,
+            velocity_horizontal.z
+            - projectile.spec.gravity_mps2 * effective_dt,
         )
         average_velocity = Vec3(
             (velocity_start.x + velocity_end.x) / 2.0,
             (velocity_start.y + velocity_end.y) / 2.0,
             (velocity_start.z + velocity_end.z) / 2.0,
         )
-        displacement = average_velocity.scale(dt_s)
+        displacement = average_velocity.scale(effective_dt)
 
         collision = sweep_projectile(projectile, displacement, targets)
         hit: ProjectileHit | None = None
@@ -240,7 +256,7 @@ class ProjectileSimulator:
 
         traveled = displacement.magnitude * actual_fraction
         projectile.distance_traveled_m += traveled
-        elapsed = dt_s * actual_fraction
+        elapsed = effective_dt * actual_fraction
         projectile.age_s += elapsed
 
         if (
