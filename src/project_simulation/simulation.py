@@ -8,6 +8,8 @@ from enum import IntEnum
 from heapq import heapify, heappop, heappush
 from itertools import count
 
+from .validation import finite_number, nonnegative_number
+
 EventValue = str | int | float | bool
 
 
@@ -90,11 +92,15 @@ class SimulationKernel:
         self._handlers[kind] = handler
 
     def schedule(self, at: float, kind: str, **payload: EventValue) -> ScheduledEvent:
+        at = finite_number(at, "event time")
+        if at < self.world.time_hours:
+            raise ValueError("scheduled events may not occur before world time")
         event = ScheduledEvent(at, next(self._counter), kind, dict(payload))
         heappush(self._events, event)
         return event
 
     def advance_to(self, target_hour: float) -> None:
+        target_hour = finite_number(target_hour, "target hour")
         if target_hour < self.world.time_hours:
             raise ValueError("simulation time cannot move backward")
         while self._events and self._events[0].at <= target_hour:
@@ -130,8 +136,11 @@ class SimulationKernel:
             )
             for event in events
         ]
-        if any(event.at < self.world.time_hours for event in restored):
-            raise ValueError("pending events may not occur before world time")
+        for event in restored:
+            finite_number(event.at, "event time")
+            nonnegative_number(event.sequence, "event sequence")
+            if event.at < self.world.time_hours:
+                raise ValueError("pending events may not occur before world time")
         sequences = [event.sequence for event in restored]
         if len(sequences) != len(set(sequences)):
             raise ValueError("pending event sequence numbers must be unique")
@@ -141,6 +150,7 @@ class SimulationKernel:
         self._counter = count(next_sequence)
 
     def choose_lod(self, distance_m: float, important: bool = False) -> SimulationLOD:
+        distance_m = nonnegative_number(distance_m, "LOD distance")
         if distance_m <= 80:
             return SimulationLOD.IMMEDIATE
         if distance_m <= 1500 or important:
