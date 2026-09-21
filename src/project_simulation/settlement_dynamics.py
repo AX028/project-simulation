@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from .demographics import MigrationResult, fill_occupation, migrate, migration_pressure
 from .economy import Commodity, Market, ProductionRecipe, ProductionResult, run_production
-from .simulation import ScheduledEvent, SettlementState, SimulationKernel, WorldState
+from .simulation import ScheduledEvent, SimulationKernel, WorldState
 
 
 @dataclass(frozen=True, slots=True)
