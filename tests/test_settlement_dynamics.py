@@ -265,3 +265,61 @@ def test_nonpositive_kernel_interval_is_rejected() -> None:
         assert "positive" in str(exc)
     else:
         raise AssertionError("expected invalid interval to fail")
+
+
+def test_daily_settlement_event_is_not_a_kernel_builtin() -> None:
+    village = _settlement("v", population=10, labor={"farmer": 5})
+    world = WorldState(settlements={"v": village})
+    kernel = SimulationKernel(world)
+    before = (
+        village.population,
+        village.food_units,
+        village.wealth,
+        village.security,
+    )
+
+    kernel.schedule(24.0, "daily_settlement", settlement_id="v")
+    kernel.advance_to(24.0)
+
+    after = (
+        village.population,
+        village.food_units,
+        village.wealth,
+        village.security,
+    )
+    assert after == before
+    assert world.history[-1].endswith("unhandled event daily_settlement")
+
+
+def test_binding_uses_canonical_daily_settlement_event_kind() -> None:
+    village = _settlement("v", population=10, labor={"farmer": 5})
+    world = WorldState(settlements={"v": village})
+    dynamics = SettlementDynamics(
+        world,
+        {"v": _profile("v", initial_food=0.0)},
+    )
+    kernel = SimulationKernel(world)
+
+    dynamics.bind_to_kernel(kernel, first_hour=24.0)
+
+    events = kernel.pending_events()
+    assert len(events) == 1
+    assert events[0].kind == "daily_settlement"
+
+
+def test_binding_settlement_dynamics_twice_is_rejected() -> None:
+    village = _settlement("v")
+    world = WorldState(settlements={"v": village})
+    dynamics = SettlementDynamics(
+        world,
+        {"v": _profile("v", initial_food=1.0)},
+    )
+    kernel = SimulationKernel(world)
+    dynamics.bind_to_kernel(kernel)
+
+    try:
+        dynamics.bind_to_kernel(kernel)
+    except ValueError as exc:
+        assert "already bound" in str(exc)
+    else:
+        raise AssertionError("expected duplicate settlement binding to fail")
