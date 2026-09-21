@@ -16,6 +16,8 @@ from .models import BodyPart
 from .navigation import move_actor_with_collisions
 from .npc_controller import NPCController
 from .physiology import Loadout, PhysicalItem, Physiology
+from .projectiles import ProjectileSimulator, ProjectileSpec
+from .ranged import RangedWeapon, aim_point_for_body_part, resolve_projectile_impact
 from .schedules import RoutineBlock, RoutineSchedule
 from .simulation import SimulationKernel, WorldState
 from .spatial import Bounds, SpatialEntity, Vec3, observe
@@ -43,6 +45,7 @@ class CommandKind(StrEnum):
     TALK = "talk"
     OPEN = "open"
     CLOSE = "close"
+    SHOOT = "shoot"
     HELP = "help"
     QUIT = "quit"
 
@@ -84,6 +87,7 @@ class TextWorldSession:
     scenery: tuple[SpatialEntity, ...] = ()
     world_items: dict[str, PhysicalItem] = field(default_factory=dict)
     doors: dict[str, Door] = field(default_factory=dict)
+    ranged_weapons: dict[str, RangedWeapon] = field(default_factory=dict)
     kernel: SimulationKernel | None = None
     ambient: AmbientNPCSimulation | None = None
     elapsed_seconds: float = 0.0
@@ -120,6 +124,7 @@ class TextWorldSession:
             CommandKind.TALK: self._talk,
             CommandKind.OPEN: self._open,
             CommandKind.CLOSE: self._close,
+            CommandKind.SHOOT: self._shoot,
             CommandKind.HELP: self._help,
             CommandKind.QUIT: self._quit,
         }[command.kind]
@@ -453,13 +458,127 @@ class TextWorldSession:
             raise ValueError(f"ambiguous door: {query}")
         return matches[0]
 
+    def _shoot(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        if not 1 <= len(args) <= 2:
+            raise ValueError("usage: shoot <target> [body_part]")
+        target_id = self._resolve_actor(args[0])
+        if target_id == self.player_id:
+            raise ValueError("cannot shoot yourself")
+        if self.player_id not in self.ranged_weapons:
+            raise ValueError("you do not have a ranged weapon")
+        if target_id not in self.combatants:
+            raise ValueError("target does not have a detailed combat profile")
+
+        part = BodyPart.TORSO
+        if len(args) == 2:
+            try:
+                part = BodyPart(args[1].lower())
+            except ValueError as exc:
+                valid = ", ".join(item.value for item in BodyPart)
+                raise ValueError(f"body_part must be one of: {valid}") from exc
+
+        target = self.actors[target_id]
+        origin = self.player.spatial.position + Vec3(
+            0.0,
+            0.0,
+            self.player.spatial.bounds.height * 0.85,
+        )
+        aim_point = aim_point_for_body_part(target.spatial, part)
+        direction = aim_point - origin
+        if direction.magnitude <= 0:
+            raise ValueError("target is too close for a valid shot")
+        self.player.spatial.facing = Vec3(
+            direction.x,
+            direction.y,
+            0.0,
+        ).normalized()
+
+        weapon = self.ranged_weapons[self.player_id]
+        projectile = weapon.fire(
+            owner_id=self.player_id,
+            origin=origin,
+            direction=direction,
+        )
+        simulator = ProjectileSimulator()
+        simulator.launch(projectile)
+
+        projectile_targets = [
+            actor.spatial
+            for actor_id, actor in self.actors.items()
+            if actor_id != self.player_id
+        ]
+        projectile_targets.extend(self.scenery)
+        projectile_targets.extend(
+            door.spatial
+            for door in self.doors.values()
+            if not door.is_open and not door.destroyed
+        )
+        steps = simulator.simulate_until_inactive(
+            projectile.projectile_id,
+            projectile_targets,
+            dt_s=0.01,
+        )
+        hit = next(
+            (step.hit for step in steps if step.hit is not None),
+            None,
+        )
+        flight_time = sum(step.elapsed_s for step in steps)
+        self._advance_clock(max(1.0, flight_time))
+
+        if hit is None:
+            return (
+                f"You fire {weapon.name}, but the projectile hits nothing. "
+                f"Ammunition remaining: {weapon.ammunition}.",
+                False,
+            )
+
+        if hit.target_id in self.combatants:
+            combatant = self.combatants[hit.target_id]
+            impact_part = part if hit.target_id == target_id else BodyPart.TORSO
+            impact = resolve_projectile_impact(
+                hit,
+                combatant.actor,
+                combatant.world_actor.physiology,
+                selected_part=impact_part,
+                penetration_factor=weapon.penetration_factor,
+            )
+            prefix = (
+                ""
+                if hit.target_id == target_id
+                else f"The shot is intercepted by {combatant.actor.name}. "
+            )
+            return (
+                f"{prefix}{impact.text} Ammunition remaining: "
+                f"{weapon.ammunition}.",
+                False,
+            )
+
+        if hit.target_id in self.doors:
+            door = self.doors[hit.target_id]
+            door_damage = max(0.0, hit.kinetic_energy_j ** 0.5)
+            dealt = door.apply_damage(door_damage)
+            return (
+                f"The projectile strikes {door.name} for {dealt:.1f} structural "
+                f"damage. Ammunition remaining: {weapon.ammunition}.",
+                False,
+            )
+
+        struck = self._resolve_entity(hit.target_id)
+        return (
+            f"The projectile strikes {struck.name} at "
+            f"{hit.kinetic_energy_j:.1f} J. Ammunition remaining: "
+            f"{weapon.ammunition}.",
+            False,
+        )
+
     def _help(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "help")
         return (
             "Commands: look, map, move <direction> [m], advance <target> [s], "
             "attack <target> [body_part], inspect <target>, wait [s], "
             "status, take <item>, drop <item>, inventory, "
-            "talk <target> [topic], open <door>, close <door>, help, quit.",
+            "talk <target> [topic], open <door>, close <door>, "
+            "shoot <target> [body_part], help, quit.",
             False,
         )
 
@@ -671,6 +790,21 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         }
     )
 
+    hunting_bow = RangedWeapon(
+        name="hunting bow",
+        projectile_spec=ProjectileSpec(
+            "arrow",
+            mass_kg=0.03,
+            radius_m=0.01,
+            drag_coefficient=0.002,
+            gravity_mps2=9.81,
+            max_lifetime_s=5.0,
+        ),
+        muzzle_speed_mps=60.0,
+        ammunition=12,
+        penetration_factor=1.0,
+    )
+
     gate = Door(
         "gate",
         "Wooden gate",
@@ -704,6 +838,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         scenery=scenery,
         world_items={"rope": rope},
         doors={"gate": gate},
+        ranged_weapons={player_actor.actor_id: hunting_bow},
         kernel=kernel,
         ambient=mira_ambient,
         seed=seed,
