@@ -121,6 +121,7 @@ from .textworld import (
     build_demo_session,
     parse_command,
 )
+from .textworld_replay import TextWorldReplayStore, session_digest
 from .worldstate import WorldActor
 from .worldstate_persistence import WorldStateStore
 
@@ -157,6 +158,8 @@ __all__ = [
     "parse_command",
     "build_demo_session",
     "TextWorldSession",
+    "session_digest",
+    "TextWorldReplayStore",
     "ParsedCommand",
     "CommandResult",
     "CommandKind",
