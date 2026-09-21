@@ -147,10 +147,10 @@ class Planner:
                     continue
                 next_state = self._apply(state, action.effects)
                 next_cost = cost + action.total_cost
-                key = self._key(next_state)
-                if next_cost >= best_cost.get(key, float("inf")):
+                state_key = self._key(next_state)
+                if next_cost >= best_cost.get(state_key, float("inf")):
                     continue
-                best_cost[key] = next_cost
+                best_cost[state_key] = next_cost
                 heappush(
                     frontier,
                     (
