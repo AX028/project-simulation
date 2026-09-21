@@ -10,7 +10,7 @@ from enum import StrEnum
 from .cognition import Mind
 from .content import create_character, create_enemy
 from .models import BodyPart
-from .physiology import Loadout, Physiology
+from .physiology import Loadout, PhysicalItem, Physiology
 from .simulation import SimulationKernel, WorldState
 from .spatial import Bounds, SpatialEntity, Vec3, observe
 from .spatial_combat import (
@@ -31,6 +31,9 @@ class CommandKind(StrEnum):
     INSPECT = "inspect"
     WAIT = "wait"
     STATUS = "status"
+    TAKE = "take"
+    DROP = "drop"
+    INVENTORY = "inventory"
     HELP = "help"
     QUIT = "quit"
 
@@ -70,6 +73,7 @@ class TextWorldSession:
     combatants: dict[str, SpatialCombatant]
     rng: random.Random
     scenery: tuple[SpatialEntity, ...] = ()
+    world_items: dict[str, PhysicalItem] = field(default_factory=dict)
     kernel: SimulationKernel | None = None
     elapsed_seconds: float = 0.0
     transcript: list[str] = field(default_factory=list)
@@ -98,6 +102,9 @@ class TextWorldSession:
             CommandKind.INSPECT: self._inspect,
             CommandKind.WAIT: self._wait,
             CommandKind.STATUS: self._status,
+            CommandKind.TAKE: self._take,
+            CommandKind.DROP: self._drop,
+            CommandKind.INVENTORY: self._inventory,
             CommandKind.HELP: self._help,
             CommandKind.QUIT: self._quit,
         }[command.kind]
@@ -231,12 +238,106 @@ class TextWorldSession:
             False,
         )
 
+    def _take(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        self._expect_count(args, 1, "take <item>")
+        entity = self._resolve_entity(args[0])
+        try:
+            item = self.world_items[entity.entity_id]
+        except KeyError as exc:
+            raise ValueError(f"{entity.name} cannot be taken") from exc
+
+        distance = self.player.spatial.position.distance_to(entity.position)
+        if distance > 1.5:
+            raise ValueError(
+                f"{entity.name} is too far away to take ({distance:.2f} m)"
+            )
+        observation = observe(
+            self.player.spatial,
+            entity,
+            self.player.vision,
+            obstacles=self.entities,
+        )
+        if observation is None:
+            raise ValueError(f"you cannot currently perceive {entity.name}")
+
+        self.player.loadout.carried_loose.append(item)
+        self.scenery = tuple(
+            candidate
+            for candidate in self.scenery
+            if candidate.entity_id != entity.entity_id
+        )
+        del self.world_items[entity.entity_id]
+        self._advance_clock(0.5)
+        return (
+            f"You take {item.name}. Carried mass: "
+            f"{self.player.loadout.carried_mass_kg:.2f} kg.",
+            False,
+        )
+
+    def _drop(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        self._expect_count(args, 1, "drop <item>")
+        lowered = args[0].lower()
+        matches = [
+            item
+            for item in self.player.loadout.carried_loose
+            if item.item_id.lower() == lowered or item.name.lower() == lowered
+        ]
+        if len(matches) != 1:
+            if not matches:
+                raise ValueError(f"you are not carrying: {args[0]}")
+            raise ValueError(f"ambiguous carried item: {args[0]}")
+
+        item = matches[0]
+        self.player.loadout.carried_loose.remove(item)
+        position = (
+            self.player.spatial.position
+            + self.player.spatial.facing.normalized().scale(0.6)
+        )
+        volume_m3 = max(0.000125, item.volume_l / 1000.0)
+        side = volume_m3 ** (1.0 / 3.0)
+        entity = SpatialEntity(
+            item.item_id,
+            item.name,
+            position,
+            bounds=Bounds(side / 2.0, side / 2.0, side),
+            mass_kg=item.mass_kg,
+            tags=frozenset({"item"}),
+        )
+        self.scenery = (*self.scenery, entity)
+        self.world_items[item.item_id] = item
+        self._advance_clock(0.5)
+        return (
+            f"You drop {item.name}. Carried mass: "
+            f"{self.player.loadout.carried_mass_kg:.2f} kg.",
+            False,
+        )
+
+    def _inventory(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        self._expect_count(args, 0, "inventory")
+        items = self.player.loadout.carried_loose
+        if not items:
+            return (
+                f"You are carrying nothing. Load ratio "
+                f"{self.player.loadout.load_ratio:.2f}.",
+                False,
+            )
+        lines = ", ".join(
+            f"{item.name} ({item.mass_kg:.2f} kg)"
+            for item in sorted(items, key=lambda value: value.item_id)
+        )
+        return (
+            f"Carrying: {lines}. Total "
+            f"{self.player.loadout.carried_mass_kg:.2f} kg; "
+            f"load ratio {self.player.loadout.load_ratio:.2f}.",
+            False,
+        )
+
     def _help(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "help")
         return (
             "Commands: look, map, move <direction> [m], advance <target> [s], "
             "attack <target> [body_part], inspect <target>, wait [s], "
-            "status, help, quit.",
+            "status, take <item>, drop <item>, inventory, help, quit.",
             False,
         )
 
@@ -349,6 +450,14 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         handling=1.15,
         strike_speed_mps=9.0,
     )
+    rope = PhysicalItem(
+        "rope",
+        "Rope",
+        mass_kg=1.8,
+        volume_l=3.0,
+        length_m=8.0,
+        accessibility_s=1.0,
+    )
     scenery = (
         SpatialEntity(
             "barrel",
@@ -357,6 +466,14 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
             bounds=Bounds(0.4, 0.4, 0.9),
             mass_kg=35.0,
             tags=frozenset({"cover"}),
+        ),
+        SpatialEntity(
+            "rope",
+            "Rope",
+            Vec3(0.5, 0.8, 0.0),
+            bounds=Bounds(0.15, 0.15, 0.1),
+            mass_kg=rope.mass_kg,
+            tags=frozenset({"item"}),
         ),
     )
     kernel = SimulationKernel(WorldState())
@@ -380,6 +497,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         },
         rng=random.Random(seed),
         scenery=scenery,
+        world_items={"rope": rope},
         kernel=kernel,
         seed=seed,
     )
