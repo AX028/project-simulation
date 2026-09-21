@@ -55,6 +55,36 @@ def session_digest(session: TextWorldSession) -> str:
             }
             for actor_id, combatant in sorted(session.combatants.items())
         },
+        "inventory": [
+            {
+                "id": item.item_id,
+                "name": item.name,
+                "mass_kg": round(item.mass_kg, 9),
+                "volume_l": round(item.volume_l, 9),
+                "length_m": round(item.length_m, 9),
+            }
+            for item in sorted(
+                session.player.loadout.carried_loose,
+                key=lambda value: value.item_id,
+            )
+        ],
+        "world_items": {
+            item_id: {
+                "name": item.name,
+                "mass_kg": round(item.mass_kg, 9),
+                "volume_l": round(item.volume_l, 9),
+                "length_m": round(item.length_m, 9),
+            }
+            for item_id, item in sorted(session.world_items.items())
+        },
+        "scenery": {
+            entity.entity_id: [
+                round(entity.position.x, 9),
+                round(entity.position.y, 9),
+                round(entity.position.z, 9),
+            ]
+            for entity in sorted(session.scenery, key=lambda value: value.entity_id)
+        },
         "kernel_time": (
             None
             if session.kernel is None
