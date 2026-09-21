@@ -273,6 +273,11 @@ class WorldConfig:
     height: int = 64
     chunk_size: int = 16
 
+    def __post_init__(self) -> None:
+        positive_number(self.width, "world width")
+        positive_number(self.height, "world height")
+        positive_number(self.chunk_size, "world chunk size")
+
 
 @dataclass(slots=True)
 class WorldMap:
