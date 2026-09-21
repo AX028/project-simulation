@@ -60,6 +60,7 @@ class AmbientNPCSimulation:
         *,
         start_world_hour: float,
         seconds: float,
+        skip_actor_ids: frozenset[str] = frozenset(),
     ) -> tuple[AmbientEvent, ...]:
         if seconds < 0:
             raise ValueError("seconds may not be negative")
@@ -68,6 +69,8 @@ class AmbientNPCSimulation:
 
         events: list[AmbientEvent] = []
         for actor_id in sorted(self.agents):
+            if actor_id in skip_actor_ids:
+                continue
             events.extend(
                 self._advance_agent(
                     self.agents[actor_id],
