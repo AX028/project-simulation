@@ -24,6 +24,7 @@ class RangedWeapon:
     ammunition: int
     penetration_factor: float = 1.0
     shots_fired: int = 0
+    skill_id: str = "archery"
 
     def __post_init__(self) -> None:
         if self.muzzle_speed_mps <= 0:
@@ -32,6 +33,8 @@ class RangedWeapon:
             raise ValueError("ammunition may not be negative")
         if self.penetration_factor <= 0:
             raise ValueError("penetration_factor must be positive")
+        if not self.skill_id:
+            raise ValueError("skill_id may not be empty")
 
     def fire(
         self,
