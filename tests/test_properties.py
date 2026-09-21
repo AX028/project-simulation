@@ -1,3 +1,6 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import numpy as np
 import pytest
 from hypothesis import given, settings
@@ -189,7 +192,6 @@ def test_collision_movement_never_penetrates_solid_wall(
     seed=st.integers(min_value=0, max_value=2**31 - 1),
 )
 def test_generated_world_round_trip_is_exact(
-    tmp_path,
     width: int,
     height: int,
     chunk_size: int,
@@ -197,10 +199,10 @@ def test_generated_world_round_trip_is_exact(
 ) -> None:
     config = WorldConfig(width, height, chunk_size)
     world = generate_world(config, seed)
-    path = tmp_path / "property-world.h5"
-
-    WorldStore.write(world, path)
-    restored = WorldStore.read(path)
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "property-world.h5"
+        WorldStore.write(world, path)
+        restored = WorldStore.read(path)
 
     assert restored.seed == seed
     assert restored.config == config
