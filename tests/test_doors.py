@@ -5,7 +5,6 @@ from project_simulation import (
     Door,
     Loadout,
     Mind,
-    PassageAxis,
     Physiology,
     SpatialEntity,
     Vec3,
