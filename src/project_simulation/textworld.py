@@ -13,6 +13,7 @@ from .cognition import Belief, Memory, Mind
 from .content import create_character, create_enemy
 from .dialogue import converse
 from .doors import Door, PassageAxis
+from .environment import EnvironmentState
 from .models import BodyPart
 from .navigation import move_actor_with_collisions
 from .npc_controller import NPCController
@@ -91,6 +92,7 @@ class TextWorldSession:
     ranged_weapons: dict[str, RangedWeapon] = field(default_factory=dict)
     hearing_profiles: dict[str, HearingProfile] = field(default_factory=dict)
     sound_events: list[SoundEvent] = field(default_factory=list)
+    environment: EnvironmentState = field(default_factory=EnvironmentState)
     kernel: SimulationKernel | None = None
     ambient: AmbientNPCSimulation | None = None
     elapsed_seconds: float = 0.0
@@ -148,7 +150,15 @@ class TextWorldSession:
 
     def _look(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "look")
-        return narrative_view(self.player.spatial, self.entities), False
+        return (
+            narrative_view(
+                self.player.spatial,
+                self.entities,
+                illumination=self.environment.illumination,
+                contrast=self.environment.contrast_multiplier,
+            ),
+            False,
+        )
 
     def _map(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "map")
@@ -170,7 +180,11 @@ class TextWorldSession:
         distance = self._positive_float(args[1] if len(args) == 2 else "1", "distance")
         self.player.spatial.facing = direction
         destination = self.player.spatial.position + direction.scale(distance)
-        seconds = distance / self.player.effective_speed()
+        speed = (
+            self.player.effective_speed()
+            * self.environment.movement_speed_multiplier
+        )
+        seconds = distance / max(0.001, speed)
         movement = move_actor_with_collisions(
             self.player,
             destination,
@@ -178,6 +192,8 @@ class TextWorldSession:
             self.entities,
             doors=self.doors.values(),
             exertion=0.35,
+            ambient_c=self.environment.ambient_temperature_c,
+            speed_multiplier=self.environment.movement_speed_multiplier,
         )
         self._advance_clock(seconds, already_advanced={self.player_id})
         blocked = (
@@ -211,6 +227,8 @@ class TextWorldSession:
             self.entities,
             doors=self.doors.values(),
             exertion=0.45,
+            ambient_c=self.environment.ambient_temperature_c,
+            speed_multiplier=self.environment.movement_speed_multiplier,
         )
         self._advance_clock(seconds, already_advanced={self.player_id})
         after = self.player.spatial.position.distance_to(target.spatial.position)
@@ -258,6 +276,8 @@ class TextWorldSession:
             self.player.spatial,
             target,
             self.player.vision,
+            illumination=self.environment.illumination,
+            contrast=self.environment.contrast_multiplier,
             obstacles=self.entities,
         )
         if observation is None:
@@ -283,7 +303,8 @@ class TextWorldSession:
             f"Position {self._position_text(self.player.spatial.position)}; "
             f"speed {self.player.effective_speed():.2f} m/s; "
             f"fatigue {body.fatigue:.2f}; blood lost {body.blood_lost_ml:.1f} ml; "
-            f"injuries {len(body.injuries)}.",
+            f"injuries {len(body.injuries)}; environment "
+            f"{self.environment.describe()}.",
             False,
         )
 
@@ -527,6 +548,7 @@ class TextWorldSession:
             projectile.projectile_id,
             projectile_targets,
             dt_s=0.01,
+            wind_velocity=self.environment.wind_velocity,
         )
         hit = next(
             (step.hit for step in steps if step.hit is not None),
@@ -626,6 +648,7 @@ class TextWorldSession:
             event,
             listeners,
             obstacles=self.entities,
+            ambient_noise_db=self.environment.ambient_noise_db,
         )
         for perception in heard:
             actor = self.actors.get(perception.listener_id)
@@ -680,19 +703,30 @@ class TextWorldSession:
             else self.elapsed_seconds / 3600.0
         )
 
+        self.environment.world_hour = start_world_hour
+        ambient_c = self.environment.ambient_temperature_c
+        speed_multiplier = self.environment.movement_speed_multiplier
+
         for actor_id, actor in self.actors.items():
             if actor_id in skipped or actor_id in ambient_ids:
                 continue
-            actor.physiology.tick(seconds / 60.0, exertion=0.05)
+            actor.physiology.tick(
+                seconds / 60.0,
+                exertion=0.05,
+                ambient_c=ambient_c,
+            )
 
         if self.ambient is not None:
             self.ambient.advance(
                 start_world_hour=start_world_hour,
                 seconds=seconds,
                 skip_actor_ids=frozenset(skipped),
+                ambient_c=ambient_c,
+                speed_multiplier=speed_multiplier,
             )
 
         self.elapsed_seconds += seconds
+        self.environment.advance(seconds / 3600.0)
         if self.kernel is not None:
             target_hour = self.kernel.world.time_hours + seconds / 3600.0
             self.kernel.advance_to(target_hour)
@@ -915,6 +949,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         world_items={"rope": rope},
         doors={"gate": gate},
         ranged_weapons={player_actor.actor_id: hunting_bow},
+        environment=EnvironmentState(world_hour=0.0),
         kernel=kernel,
         ambient=mira_ambient,
         seed=seed,
