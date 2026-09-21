@@ -42,6 +42,7 @@ from .economy import (
     run_production,
     transfer,
 )
+from .event_persistence import EventQueueStore
 from .information import (
     Claim,
     Transmission,
@@ -140,6 +141,7 @@ __all__ = [
     "Treaty",
     "DiplomacyEngine",
     "EmotionState",
+    "EventQueueStore",
     "EncounterResult",
     "EncounterState",
     "FactionState",
