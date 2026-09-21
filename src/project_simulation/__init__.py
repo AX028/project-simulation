@@ -113,6 +113,14 @@ from .spatial_encounter import (
     SpatialTurnResult,
 )
 from .textui import narrative_view, render_observations, tactical_map
+from .textworld import (
+    CommandKind,
+    CommandResult,
+    ParsedCommand,
+    TextWorldSession,
+    build_demo_session,
+    parse_command,
+)
 from .worldstate import WorldActor
 from .worldstate_persistence import WorldStateStore
 
@@ -146,6 +154,12 @@ __all__ = [
     "Market",
     "Commodity",
     "Claim",
+    "parse_command",
+    "build_demo_session",
+    "TextWorldSession",
+    "ParsedCommand",
+    "CommandResult",
+    "CommandKind",
     "CombatEngine",
     "CombatMode",
     "Container",
