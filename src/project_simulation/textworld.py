@@ -29,6 +29,7 @@ from .spatial_combat import (
     WeaponPhysics,
 )
 from .textui import narrative_view, tactical_map
+from .validation import positive_number
 from .worldstate import WorldActor
 
 
@@ -768,9 +769,7 @@ class TextWorldSession:
             number = float(value)
         except ValueError as exc:
             raise ValueError(f"{label} must be numeric") from exc
-        if number <= 0:
-            raise ValueError(f"{label} must be positive")
-        return number
+        return positive_number(number, label)
 
     @staticmethod
     def _position_text(position: Vec3) -> str:
