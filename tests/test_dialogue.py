@@ -169,7 +169,7 @@ def test_textworld_talk_requires_perception() -> None:
     session = build_demo_session(5)
     mira = session.actors["mira"]
     mira.spatial.position = session.player.spatial.position + mira.spatial.facing.scale(2.0)
-    session.player.spatial.facing = -mira.spatial.facing
+    session.player.spatial.facing = mira.spatial.facing.scale(-1.0)
     with pytest.raises(ValueError, match="perceive"):
         session.execute("talk Mira bridge")
 
