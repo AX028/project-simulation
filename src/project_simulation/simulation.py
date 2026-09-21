@@ -84,12 +84,14 @@ class SimulationKernel:
         self._counter = count()
         self._handlers: dict[str, EventHandler] = {
             "wolf_attack": self._wolf_attack,
-            "daily_settlement": self._daily_settlement,
             "faction_conflict": self._faction_conflict,
         }
 
     def register_handler(self, kind: str, handler: EventHandler) -> None:
         self._handlers[kind] = handler
+
+    def has_handler(self, kind: str) -> bool:
+        return kind in self._handlers
 
     def schedule(self, at: float, kind: str, **payload: EventValue) -> ScheduledEvent:
         at = finite_number(at, "event time")
@@ -172,23 +174,6 @@ class SimulationKernel:
         world.history.append(
             f"{event.at:.1f}h: wolves killed {lost:.1f} livestock near {settlement.name}"
         )
-
-    def _daily_settlement(self, world: WorldState, event: ScheduledEvent) -> None:
-        settlement_id = str(event.payload["settlement_id"])
-        settlement = world.settlements[settlement_id]
-        farmers = settlement.labor.get("farmer", 0)
-        hunters = settlement.labor.get("hunter", 0)
-        produced = farmers * 1.35 + hunters * 0.35
-        consumed = settlement.population * 0.95
-        settlement.food_units += produced - consumed
-        if settlement.food_units < 0:
-            shortage = min(1.0, abs(settlement.food_units) / max(1.0, consumed))
-            population_loss = round(shortage * 0.003 * settlement.population)
-            settlement.population = max(0, settlement.population - population_loss)
-            settlement.wealth = max(0.0, settlement.wealth * (1.0 - shortage * 0.015))
-            settlement.food_units = 0.0
-        settlement.recompute_prices()
-        self.schedule(event.at + 24.0, "daily_settlement", settlement_id=settlement_id)
 
     def _faction_conflict(self, world: WorldState, event: ScheduledEvent) -> None:
         attacker = world.factions[str(event.payload["attacker"])]
