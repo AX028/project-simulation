@@ -95,12 +95,13 @@ def count_sound_occluders(
     end: Vec3,
     obstacles: Iterable[SpatialEntity],
     *,
-    ignored_ids: frozenset[str] = frozenset(),
+    ignored_ids: frozenset[str] | None = None,
 ) -> int:
+    ignored = frozenset() if ignored_ids is None else ignored_ids
     return sum(
         1
         for obstacle in obstacles
-        if obstacle.entity_id not in ignored_ids
+        if obstacle.entity_id not in ignored
         and ("solid" in obstacle.tags or "occluder" in obstacle.tags)
         and _segment_intersects_entity(start, end, obstacle)
     )
@@ -109,10 +110,12 @@ def count_sound_occluders(
 def hear_sound(
     event: SoundEvent,
     listener: SpatialEntity,
-    profile: HearingProfile = HearingProfile(),
+    profile: HearingProfile | None = None,
     *,
     obstacles: Iterable[SpatialEntity] = (),
 ) -> HeardSound | None:
+    if profile is None:
+        profile = HearingProfile()
     listener_point = listener.position + Vec3(
         0.0,
         0.0,
