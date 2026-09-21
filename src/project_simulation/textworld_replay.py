@@ -47,10 +47,10 @@ def session_digest(session: TextWorldSession) -> str:
         },
         "combat": {
             actor_id: {
-                part.value: body.current_hp
+                str(part): body.current_hp
                 for part, body in sorted(
                     combatant.actor.body_parts.items(),
-                    key=lambda item: item[0].value,
+                    key=lambda item: str(item[0]),
                 )
             }
             for actor_id, combatant in sorted(session.combatants.items())
