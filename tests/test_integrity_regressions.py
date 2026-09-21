@@ -7,8 +7,8 @@ import pytest
 
 from project_simulation import (
     Bounds,
-    PlanAction,
     Physiology,
+    PlanAction,
     SimulationKernel,
     SpatialEntity,
     Vec3,
