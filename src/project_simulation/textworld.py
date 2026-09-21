@@ -7,8 +7,9 @@ import shlex
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from .acoustics import HearingProfile, HeardSound, SoundEvent, propagate_sound
 from .ambient import AmbientAgent, AmbientNPCSimulation
-from .cognition import Belief, Mind
+from .cognition import Belief, Memory, Mind
 from .content import create_character, create_enemy
 from .dialogue import converse
 from .doors import Door, PassageAxis
@@ -88,6 +89,8 @@ class TextWorldSession:
     world_items: dict[str, PhysicalItem] = field(default_factory=dict)
     doors: dict[str, Door] = field(default_factory=dict)
     ranged_weapons: dict[str, RangedWeapon] = field(default_factory=dict)
+    hearing_profiles: dict[str, HearingProfile] = field(default_factory=dict)
+    sound_events: list[SoundEvent] = field(default_factory=list)
     kernel: SimulationKernel | None = None
     ambient: AmbientNPCSimulation | None = None
     elapsed_seconds: float = 0.0
@@ -499,6 +502,13 @@ class TextWorldSession:
             origin=origin,
             direction=direction,
         )
+        self._emit_sound(
+            category="weapon",
+            description=f"{weapon.name} firing",
+            position=origin,
+            loudness_db_at_1m=65.0,
+            source_id=self.player_id,
+        )
         simulator = ProjectileSimulator()
         simulator.launch(projectile)
 
@@ -531,6 +541,14 @@ class TextWorldSession:
                 f"Ammunition remaining: {weapon.ammunition}.",
                 False,
             )
+
+        self._emit_sound(
+            category="impact",
+            description="projectile impact",
+            position=hit.position,
+            loudness_db_at_1m=58.0,
+            source_id=self.player_id,
+        )
 
         if hit.target_id in self.combatants:
             combatant = self.combatants[hit.target_id]
@@ -570,6 +588,64 @@ class TextWorldSession:
             f"{weapon.ammunition}.",
             False,
         )
+
+    def _emit_sound(
+        self,
+        *,
+        category: str,
+        description: str,
+        position: Vec3,
+        loudness_db_at_1m: float,
+        source_id: str | None = None,
+    ) -> tuple[HeardSound, ...]:
+        created_hour = (
+            self.kernel.world.time_hours
+            if self.kernel is not None
+            else self.elapsed_seconds / 3600.0
+        )
+        event = SoundEvent(
+            sound_id=f"sound-{len(self.sound_events)}",
+            position=position,
+            loudness_db_at_1m=loudness_db_at_1m,
+            category=category,
+            description=description,
+            created_hour=created_hour,
+            source_id=source_id,
+        )
+        self.sound_events.append(event)
+
+        listeners = [
+            (
+                actor.spatial,
+                self.hearing_profiles.get(actor_id, HearingProfile()),
+            )
+            for actor_id, actor in self.actors.items()
+            if actor_id != source_id
+        ]
+        heard = propagate_sound(
+            event,
+            listeners,
+            obstacles=self.entities,
+        )
+        for perception in heard:
+            actor = self.actors.get(perception.listener_id)
+            if actor is None:
+                continue
+            confidence = max(0.05, min(1.0, 0.2 + 0.8 * perception.clarity))
+            actor.mind.remember(
+                Memory(
+                    subject=category,
+                    proposition=f"heard {description}",
+                    importance=0.45,
+                    emotional_intensity=0.25,
+                    confidence=confidence,
+                    accuracy=perception.clarity,
+                    source="hearing",
+                    created_at=created_hour,
+                    tags=frozenset({"sound", category}),
+                )
+            )
+        return heard
 
     def _help(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "help")
