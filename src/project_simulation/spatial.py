@@ -6,12 +6,19 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import acos, degrees, sqrt
 
+from .validation import bounded_number, finite_number, nonnegative_number, positive_number
+
 
 @dataclass(frozen=True, slots=True)
 class Vec3:
     x: float
     y: float
     z: float = 0.0
+
+    def __post_init__(self) -> None:
+        finite_number(self.x, "x coordinate")
+        finite_number(self.y, "y coordinate")
+        finite_number(self.z, "z coordinate")
 
     def __add__(self, other: Vec3) -> Vec3:
         return Vec3(self.x + other.x, self.y + other.y, self.z + other.z)
@@ -43,6 +50,11 @@ class Bounds:
     half_depth: float
     height: float
 
+    def __post_init__(self) -> None:
+        positive_number(self.half_width, "half width")
+        positive_number(self.half_depth, "half depth")
+        positive_number(self.height, "height")
+
 
 @dataclass(slots=True)
 class SpatialEntity:
@@ -56,6 +68,9 @@ class SpatialEntity:
     visible: bool = True
     tags: frozenset[str] = frozenset()
 
+    def __post_init__(self) -> None:
+        positive_number(self.mass_kg, "entity mass")
+
 
 @dataclass(frozen=True, slots=True)
 class VisionProfile:
@@ -63,6 +78,17 @@ class VisionProfile:
     field_of_view_degrees: float = 160.0
     max_distance_m: float = 120.0
     night_vision: float = 0.2
+
+    def __post_init__(self) -> None:
+        nonnegative_number(self.acuity, "visual acuity")
+        bounded_number(
+            self.field_of_view_degrees,
+            "field of view",
+            0.000001,
+            360.0,
+        )
+        positive_number(self.max_distance_m, "vision distance")
+        bounded_number(self.night_vision, "night vision", 0.0, 1.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +163,13 @@ def observe(
         return None
     if profile is None:
         profile = VisionProfile()
+    illumination = bounded_number(
+        illumination,
+        "illumination",
+        0.0,
+        1.0,
+    )
+    contrast = nonnegative_number(contrast, "contrast")
 
     distance = observer.position.distance_to(target.position)
     if distance > profile.max_distance_m:
