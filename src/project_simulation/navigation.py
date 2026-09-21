@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from math import inf
 
+from .doors import Door
 from .spatial import SpatialEntity, Vec3
 from .worldstate import WorldActor
 
@@ -128,12 +129,40 @@ def sweep_entity(
     return best
 
 
+
+def sweep_doors(
+    mover: SpatialEntity,
+    displacement: Vec3,
+    doors: Iterable[Door],
+) -> SweepHit | None:
+    """Return the earliest doorway crossing that the mover cannot pass."""
+    if displacement.magnitude <= _EPSILON:
+        return None
+
+    best: SweepHit | None = None
+    for door in doors:
+        fraction = door.blocks_crossing(mover, displacement)
+        if fraction is None:
+            continue
+        candidate = SweepHit(
+            door.door_id,
+            fraction,
+            mover.position + displacement.scale(fraction),
+        )
+        if best is None or (candidate.fraction, candidate.entity_id) < (
+            best.fraction,
+            best.entity_id,
+        ):
+            best = candidate
+    return best
+
 def move_actor_with_collisions(
     actor: WorldActor,
     destination: Vec3,
     seconds: float,
     obstacles: Iterable[SpatialEntity],
     *,
+    doors: Iterable[Door] = (),
     exertion: float = 0.35,
     clearance_m: float = 0.002,
 ) -> MovementResult:
@@ -157,7 +186,14 @@ def move_actor_with_collisions(
         )
 
     displacement = delta.normalized().scale(requested)
-    hit = sweep_entity(actor.spatial, displacement, obstacles)
+    solid_hit = sweep_entity(actor.spatial, displacement, obstacles)
+    door_hit = sweep_doors(actor.spatial, displacement, doors)
+    candidates = [hit for hit in (solid_hit, door_hit) if hit is not None]
+    hit = min(
+        candidates,
+        key=lambda candidate: (candidate.fraction, candidate.entity_id),
+        default=None,
+    )
     allowed = requested
     if hit is not None:
         allowed = max(0.0, requested * hit.fraction - clearance_m)
