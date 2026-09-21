@@ -61,6 +61,8 @@ class AmbientNPCSimulation:
         start_world_hour: float,
         seconds: float,
         skip_actor_ids: frozenset[str] = frozenset(),
+        ambient_c: float = 20.0,
+        speed_multiplier: float = 1.0,
     ) -> tuple[AmbientEvent, ...]:
         if seconds < 0:
             raise ValueError("seconds may not be negative")
@@ -77,6 +79,8 @@ class AmbientNPCSimulation:
                     start_world_hour=start_world_hour,
                     seconds=seconds,
                     urgent_goal=self.urgent_goals.get(actor_id),
+                    ambient_c=ambient_c,
+                    speed_multiplier=speed_multiplier,
                 )
             )
         return tuple(events)
@@ -88,6 +92,8 @@ class AmbientNPCSimulation:
         start_world_hour: float,
         seconds: float,
         urgent_goal: GoalRequest | None,
+        ambient_c: float,
+        speed_multiplier: float,
     ) -> list[AmbientEvent]:
         remaining = seconds
         current_hour = start_world_hour
@@ -123,23 +129,30 @@ class AmbientNPCSimulation:
 
                 distance = agent.actor.spatial.position.distance_to(destination)
                 if distance > agent.arrival_tolerance_m:
-                    speed = agent.actor.effective_speed()
+                    speed = max(
+                        0.001,
+                        agent.actor.effective_speed() * max(0.0, speed_multiplier),
+                    )
                     movement_seconds = min(segment, distance / speed)
                     moved = agent.actor.move_toward(
                         destination,
                         movement_seconds,
                         exertion=0.25,
+                        ambient_c=ambient_c,
+                        speed_multiplier=speed_multiplier,
                     )
                     idle_seconds = segment - movement_seconds
                     if idle_seconds > 0:
                         agent.actor.physiology.tick(
                             idle_seconds / 60.0,
                             exertion=0.05,
+                            ambient_c=ambient_c,
                         )
                 else:
                     agent.actor.physiology.tick(
                         segment / 60.0,
                         exertion=0.05,
+                        ambient_c=ambient_c,
                     )
 
                 arrived = (
