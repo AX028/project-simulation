@@ -16,9 +16,9 @@ class WorldActor:
     mind: Mind
     physiology: Physiology
     loadout: Loadout
-    skills: SkillSet = field(default_factory=SkillSet)
     vision: VisionProfile = field(default_factory=VisionProfile)
     movement_speed_mps: float = 1.4
+    skills: SkillSet = field(default_factory=SkillSet)
 
     @property
     def actor_id(self) -> str:
