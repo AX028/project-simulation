@@ -14,7 +14,9 @@ from project_simulation import (
 )
 
 
-def _actor(position: Vec3 = Vec3(0.0, 0.0, 0.0)) -> WorldActor:
+def _actor(position: Vec3 | None = None) -> WorldActor:
+    if position is None:
+        position = Vec3(0.0, 0.0, 0.0)
     return WorldActor(
         SpatialEntity(
             "actor",
@@ -32,9 +34,11 @@ def _actor(position: Vec3 = Vec3(0.0, 0.0, 0.0)) -> WorldActor:
 def _wall(
     entity_id: str = "wall",
     *,
-    position: Vec3 = Vec3(0.0, 2.0, 0.0),
+    position: Vec3 | None = None,
     solid: bool = True,
 ) -> SpatialEntity:
+    if position is None:
+        position = Vec3(0.0, 2.0, 0.0)
     tags = frozenset({"solid"}) if solid else frozenset()
     return SpatialEntity(
         entity_id,
