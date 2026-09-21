@@ -10,6 +10,7 @@ from .models import BodyPart
 from .navigation import move_actor_with_collisions
 from .projectiles import ProjectileSimulator
 from .ranged import aim_point_for_body_part, resolve_projectile_impact
+from .skills import PracticeEvent
 from .spatial import Vec3
 from .spatial_combat import SpatialCombatResolver
 
@@ -92,11 +93,29 @@ def attack(
                 f"body_part must be one of: {valid}"
             ) from exc
 
+    attacker = session.combatants[session.player_id]
+    target = session.combatants[target_id]
     result = SpatialCombatResolver(session.rng).resolve_attack(
-        session.combatants[session.player_id],
-        session.combatants[target_id],
+        attacker,
+        target,
         selected_part=part,
     )
+    if result.in_reach:
+        difficulty = min(
+            100.0,
+            25.0
+            + target.actor.stats.agility * 1.5
+            + target.actor.stats.evasion * 50.0,
+        )
+        session.player.skills.practice(
+            attacker.weapon.skill_id,
+            PracticeEvent(
+                difficulty=difficulty,
+                duration_hours=1.0 / 3600.0,
+                quality=0.82 if result.hit else 0.58,
+                context=f"combat:{target.actor.archetype}",
+            ),
+        )
     session._advance_clock(1.0)
     return result.text, False
 
@@ -181,6 +200,22 @@ def shoot(
     )
     flight_time = sum(step.elapsed_s for step in steps)
     session._advance_clock(max(1.0, flight_time))
+
+    practice_quality = 0.45
+    if hit is not None and hit.target_id == target_id:
+        practice_quality = 0.85
+    elif hit is not None:
+        practice_quality = 0.60
+    shot_distance = origin.distance_to(aim_point)
+    session.player.skills.practice(
+        weapon.skill_id,
+        PracticeEvent(
+            difficulty=min(100.0, 25.0 + shot_distance * 4.0),
+            duration_hours=max(1.0, flight_time) / 3600.0,
+            quality=practice_quality,
+            context=f"ranged:{target.actor.archetype}",
+        ),
+    )
 
     if hit is None:
         return (
