@@ -27,6 +27,7 @@ class WorldActor:
         entities: list[SpatialEntity],
         *,
         illumination: float = 1.0,
+        contrast: float = 1.0,
     ) -> list[Observation]:
         observations: list[Observation] = []
         for entity in entities:
@@ -37,6 +38,7 @@ class WorldActor:
                 entity,
                 self.vision,
                 illumination=illumination,
+                contrast=contrast,
                 obstacles=entities,
             )
             if result is not None:
@@ -71,14 +73,27 @@ class WorldActor:
         physical = self.physiology.performance_modifier
         return max(0.1, self.movement_speed_mps * physical / encumbrance)
 
-    def move_toward(self, destination: Vec3, seconds: float, *, exertion: float = 0.35) -> float:
+    def move_toward(
+        self,
+        destination: Vec3,
+        seconds: float,
+        *,
+        exertion: float = 0.35,
+        ambient_c: float = 20.0,
+        speed_multiplier: float = 1.0,
+    ) -> float:
         seconds = max(0.0, seconds)
-        distance_budget = self.effective_speed() * seconds
+        speed_multiplier = max(0.0, speed_multiplier)
+        distance_budget = self.effective_speed() * speed_multiplier * seconds
         delta = destination - self.spatial.position
         actual_distance = min(distance_budget, delta.magnitude)
         if actual_distance > 0:
             self.spatial.position = (
                 self.spatial.position + delta.normalized().scale(actual_distance)
             )
-        self.physiology.tick(seconds / 60.0, exertion=exertion)
+        self.physiology.tick(
+            seconds / 60.0,
+            exertion=exertion,
+            ambient_c=ambient_c,
+        )
         return actual_distance
