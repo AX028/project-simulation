@@ -94,6 +94,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         reach_m=0.85,
         handling=1.0,
         strike_speed_mps=11.0,
+        skill_id="sword",
     )
     fangs = WeaponPhysics(
         "fangs",
@@ -101,6 +102,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         reach_m=0.25,
         handling=1.15,
         strike_speed_mps=9.0,
+        skill_id="unarmed",
     )
     rope = PhysicalItem(
         "rope",
