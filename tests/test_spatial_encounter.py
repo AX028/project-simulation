@@ -4,6 +4,8 @@ import pytest
 
 from project_simulation import (
     BodyPart,
+    Injury,
+    InjuryType,
     Loadout,
     Mind,
     PhysicalItem,
@@ -298,3 +300,48 @@ def test_fifty_turn_replay_is_deterministic() -> None:
         return tuple(log), summary
 
     assert simulate() == simulate()
+
+
+def test_physiology_advances_exactly_once_for_mover_and_attacker() -> None:
+    state = _state(distance=1.0)
+    hero, enemy = list(state.combatants)
+    for actor_id in (hero, enemy):
+        state.combatants[actor_id].world_actor.physiology.add_injury(
+            Injury(
+                "torso",
+                InjuryType.LACERATION,
+                severity=0.2,
+                bleeding_ml_per_min=60.0,
+            )
+        )
+
+    engine = SpatialEncounterEngine(random.Random(11), seconds_per_turn=1.0)
+    engine.resolve_turn(
+        state,
+        (
+            SpatialIntent(hero, enemy, SpatialAction.RETREAT),
+            SpatialIntent(enemy, hero, SpatialAction.ATTACK),
+        ),
+    )
+
+    assert (
+        state.combatants[hero].world_actor.physiology.blood_lost_ml
+        == pytest.approx(1.0)
+    )
+    assert (
+        state.combatants[enemy].world_actor.physiology.blood_lost_ml
+        == pytest.approx(1.0)
+    )
+
+
+def test_empty_turn_still_advances_time_and_detects_single_survivor() -> None:
+    state = _state(distance=1.0)
+    hero, enemy = list(state.combatants)
+    enemy_body = state.combatants[enemy].world_actor.physiology
+    assert enemy_body.blood_volume_ml is not None
+    enemy_body.blood_lost_ml = enemy_body.blood_volume_ml * 0.43
+
+    result = SpatialEncounterEngine(random.Random(12)).resolve_turn(state, ())
+
+    assert result.winner_id == hero
+    assert state.round_number == 1
