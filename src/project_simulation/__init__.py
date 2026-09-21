@@ -33,8 +33,8 @@ from .demographics import (
     unemployment_ratio,
 )
 from .dialogue import DialogueResult, converse, disposition_toward, find_belief
-from .doors import Door, PassageAxis
 from .diplomacy import DiplomacyEngine, Treaty, TreatyStatus
+from .doors import Door, PassageAxis
 from .economy import (
     Commodity,
     Market,
