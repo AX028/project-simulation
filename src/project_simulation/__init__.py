@@ -33,6 +33,7 @@ from .demographics import (
     unemployment_ratio,
 )
 from .dialogue import DialogueResult, converse, disposition_toward, find_belief
+from .doors import Door, PassageAxis
 from .diplomacy import DiplomacyEngine, Treaty, TreatyStatus
 from .economy import (
     Commodity,
@@ -66,7 +67,13 @@ from .models import (
     WorldConfig,
     WorldMap,
 )
-from .navigation import MovementResult, SweepHit, move_actor_with_collisions, sweep_entity
+from .navigation import (
+    MovementResult,
+    SweepHit,
+    move_actor_with_collisions,
+    sweep_doors,
+    sweep_entity,
+)
 from .npc_controller import AgentDirective, GoalRequest, NPCController
 from .physiology import (
     Container,
@@ -173,6 +180,9 @@ __all__ = [
     "CombatMode",
     "Container",
     "DamageType",
+    "sweep_doors",
+    "PassageAxis",
+    "Door",
     "find_belief",
     "disposition_toward",
     "converse",
