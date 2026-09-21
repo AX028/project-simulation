@@ -10,7 +10,6 @@ from project_simulation import (
     WorldState,
 )
 
-
 FOOD = Commodity("food", "Food", base_price=1.0, mass_kg=1.0)
 WOOD = Commodity("wood", "Wood", base_price=2.0, mass_kg=1.0)
 
