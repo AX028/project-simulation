@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import inf, sqrt
 
-from .spatial import Bounds, SpatialEntity, Vec3
+from .spatial import SpatialEntity, Vec3
 
 _EPSILON = 1e-9
 
