@@ -22,6 +22,7 @@ from .cognition import (
     Mind,
     Relationship,
 )
+from .dialogue import DialogueResult, converse, disposition_toward, find_belief
 from .demographics import (
     MigrationResult,
     employed_population,
@@ -167,6 +168,10 @@ __all__ = [
     "CombatMode",
     "Container",
     "DamageType",
+    "find_belief",
+    "disposition_toward",
+    "converse",
+    "DialogueResult",
     "TreatyStatus",
     "Treaty",
     "DiplomacyEngine",
