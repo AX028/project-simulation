@@ -27,6 +27,7 @@ class WeaponPhysics:
     strike_speed_mps: float = 12.0
     edge_factor: float = 1.0
     strike_type: StrikeType = StrikeType.CUT
+    skill_id: str = "melee"
 
 
 @dataclass(slots=True)
@@ -93,10 +94,18 @@ class SpatialCombatResolver:
 
         attack_performance = attacker.world_actor.physiology.performance_modifier
         defense_performance = target.world_actor.physiology.performance_modifier
+        skill_modifier = attacker.world_actor.skills.performance_modifier(
+            attacker.weapon.skill_id
+        )
         handling = max(0.1, min(1.5, attacker.weapon.handling))
         encumbrance = max(1.0, attacker.world_actor.loadout.fatigue_multiplier)
 
-        attack_quality = attacker.actor.stats.accuracy * attack_performance * handling
+        attack_quality = (
+            attacker.actor.stats.accuracy
+            * attack_performance
+            * handling
+            * skill_modifier
+        )
         attack_quality /= sqrt(encumbrance)
         defense = target.actor.stats.evasion * defense_performance
         distance_factor = max(0.55, 1.0 - 0.25 * (distance / max(0.1, reach)))
