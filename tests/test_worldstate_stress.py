@@ -2,14 +2,20 @@ import random
 
 from project_simulation import (
     CandidateAction,
+    Commodity,
     Goal,
     Loadout,
+    Market,
     Memory,
     Mind,
+    OccupationRecipe,
     PhysicalItem,
     Physiology,
     PlanAction,
     Planner,
+    ProductionRecipe,
+    SettlementDynamics,
+    SettlementEconomicProfile,
     SettlementState,
     SimulationKernel,
     SimulationLOD,
@@ -136,8 +142,26 @@ def _simulate_village() -> SettlementState:
         labor={"farmer": 120, "hunter": 5},
     )
     world = WorldState(settlements={"v1": village})
+    food = Commodity("food", "Food", base_price=1.0, mass_kg=1.0)
+    profile = SettlementEconomicProfile(
+        "v1",
+        Market(stock={"food": 260.0}),
+        commodities={"food": food},
+        occupation_recipes=(
+            OccupationRecipe(
+                "farmer",
+                ProductionRecipe(
+                    "farm-food",
+                    inputs={},
+                    outputs={"food": 1.35},
+                    labor_hours=8.0,
+                ),
+            ),
+        ),
+    )
+    dynamics = SettlementDynamics(world, {"v1": profile})
     kernel = SimulationKernel(world)
-    kernel.schedule(24.0, "daily_settlement", settlement_id="v1")
+    dynamics.bind_to_kernel(kernel, first_hour=24.0)
     kernel.schedule(240.0, "wolf_attack", settlement_id="v1", severity=0.2)
     kernel.advance_to(24.0 * 30)
     return village
