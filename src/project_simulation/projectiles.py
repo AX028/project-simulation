@@ -170,6 +170,8 @@ class ProjectileSimulator:
         projectile_id: str,
         dt_s: float,
         targets: Iterable[SpatialEntity],
+        *,
+        wind_velocity: Vec3 | None = None,
     ) -> ProjectileStep:
         if dt_s <= 0:
             raise ValueError("dt_s must be positive")
@@ -197,13 +199,14 @@ class ProjectileSimulator:
 
         start = projectile.position
         velocity_start = projectile.velocity
+        wind = Vec3(0.0, 0.0, 0.0) if wind_velocity is None else wind_velocity
         drag = max(
             0.0,
             1.0 - projectile.spec.drag_coefficient * effective_dt,
         )
         velocity_horizontal = Vec3(
-            velocity_start.x * drag,
-            velocity_start.y * drag,
+            wind.x + (velocity_start.x - wind.x) * drag,
+            wind.y + (velocity_start.y - wind.y) * drag,
             velocity_start.z,
         )
         velocity_end = Vec3(
@@ -281,6 +284,7 @@ class ProjectileSimulator:
         *,
         dt_s: float = 0.02,
         max_steps: int = 100_000,
+        wind_velocity: Vec3 | None = None,
     ) -> tuple[ProjectileStep, ...]:
         if max_steps <= 0:
             raise ValueError("max_steps must be positive")
@@ -290,7 +294,14 @@ class ProjectileSimulator:
             projectile = self.projectiles[projectile_id]
             if not projectile.active:
                 break
-            steps.append(self.step(projectile_id, dt_s, target_list))
+            steps.append(
+                self.step(
+                    projectile_id,
+                    dt_s,
+                    target_list,
+                    wind_velocity=wind_velocity,
+                )
+            )
         return tuple(steps)
 
 
