@@ -160,6 +160,7 @@ class TextWorldSession:
         except KeyError as exc:
             raise ValueError("direction must be north, south, east, or west") from exc
         distance = self._positive_float(args[1] if len(args) == 2 else "1", "distance")
+        self.player.spatial.facing = direction
         destination = self.player.spatial.position + direction.scale(distance)
         seconds = distance / self.player.effective_speed()
         movement = move_actor_with_collisions(
@@ -191,6 +192,9 @@ class TextWorldSession:
             raise ValueError("cannot advance toward yourself")
         seconds = self._positive_float(args[1] if len(args) == 2 else "1", "seconds")
         target = self.actors[target_id]
+        direction = target.spatial.position - self.player.spatial.position
+        if direction.magnitude > 0:
+            self.player.spatial.facing = direction.normalized()
         before = self.player.spatial.position.distance_to(target.spatial.position)
         movement = move_actor_with_collisions(
             self.player,
