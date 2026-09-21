@@ -84,6 +84,17 @@ from .physiology import (
     Physiology,
 )
 from .planning import Plan, PlanAction, Planner, WorldFact
+from .projectiles import (
+    Projectile,
+    ProjectileHit,
+    ProjectileSimulator,
+    ProjectileSpec,
+    ProjectileStep,
+    ballistic_drop_m,
+    impact_speed_from_energy,
+    launch_velocity,
+    sweep_projectile,
+)
 from .rumors import RumorDelivery, RumorNetwork, SocialLink
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
 from .settlement_dynamics import (
@@ -215,6 +226,15 @@ __all__ = [
     "PlanAction",
     "Planner",
     "PhysicalItem",
+    "sweep_projectile",
+    "launch_velocity",
+    "impact_speed_from_energy",
+    "ballistic_drop_m",
+    "ProjectileStep",
+    "ProjectileSpec",
+    "ProjectileSimulator",
+    "ProjectileHit",
+    "Projectile",
     "Physiology",
     "PlayerCharacter",
     "Relationship",
