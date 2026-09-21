@@ -95,6 +95,12 @@ from .projectiles import (
     launch_velocity,
     sweep_projectile,
 )
+from .ranged import (
+    RangedImpactResult,
+    RangedWeapon,
+    aim_point_for_body_part,
+    resolve_projectile_impact,
+)
 from .rumors import RumorDelivery, RumorNetwork, SocialLink
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
 from .settlement_dynamics import (
@@ -238,6 +244,10 @@ __all__ = [
     "Physiology",
     "PlayerCharacter",
     "Relationship",
+    "resolve_projectile_impact",
+    "aim_point_for_body_part",
+    "RangedWeapon",
+    "RangedImpactResult",
     "SocialLink",
     "RumorNetwork",
     "RumorDelivery",
