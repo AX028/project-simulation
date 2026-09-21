@@ -16,9 +16,17 @@ from project_simulation import (
 )
 
 
+def _wolf_id(session) -> str:
+    return next(
+        actor_id
+        for actor_id, actor in session.actors.items()
+        if actor.spatial.name == "Wolf"
+    )
+
+
 def test_shoot_wolf_consumes_ammo_and_damages_torso() -> None:
     session = build_demo_session(14)
-    wolf = session.combatants["wolf"]
+    wolf = session.combatants[_wolf_id(session)]
     before_hp = wolf.actor.body_parts[BodyPart.TORSO].current_hp
     before_ammo = session.ranged_weapons[session.player_id].ammunition
 
@@ -32,7 +40,7 @@ def test_shoot_wolf_consumes_ammo_and_damages_torso() -> None:
 def test_shoot_specific_limb_creates_matching_injury() -> None:
     session = build_demo_session(15)
     session.execute("shoot Wolf left_leg")
-    injuries = session.actors["wolf"].physiology.injuries
+    injuries = session.actors[_wolf_id(session)].physiology.injuries
     assert injuries
     assert injuries[-1].location == BodyPart.LEFT_LEG.value
     assert injuries[-1].mobility_penalty > 0
@@ -47,7 +55,7 @@ def test_solid_scenery_intercepts_shot_before_target() -> None:
         tags=frozenset({"solid", "occluder"}),
     )
     session.scenery = (*session.scenery, blocker)
-    wolf = session.combatants["wolf"]
+    wolf = session.combatants[_wolf_id(session)]
     before = wolf.actor.body_parts[BodyPart.TORSO].current_hp
 
     result = session.execute("shoot Wolf torso")
@@ -58,7 +66,7 @@ def test_solid_scenery_intercepts_shot_before_target() -> None:
 
 def test_closed_gate_intercepts_and_takes_structural_damage() -> None:
     session = build_demo_session(17)
-    wolf_world = session.actors["wolf"]
+    wolf_world = session.actors[_wolf_id(session)]
     wolf_world.spatial.position = Vec3(6.0, 0.0, 0.0)
     before = session.doors["gate"].integrity
 
@@ -71,9 +79,9 @@ def test_closed_gate_intercepts_and_takes_structural_damage() -> None:
 def test_open_gate_allows_projectile_through() -> None:
     session = build_demo_session(18)
     session.doors["gate"].open_door()
-    wolf_world = session.actors["wolf"]
+    wolf_world = session.actors[_wolf_id(session)]
     wolf_world.spatial.position = Vec3(6.0, 0.0, 0.0)
-    wolf = session.combatants["wolf"]
+    wolf = session.combatants[_wolf_id(session)]
     before = wolf.actor.body_parts[BodyPart.TORSO].current_hp
 
     result = session.execute("shoot Wolf torso")
@@ -176,6 +184,6 @@ def test_one_hundred_shots_preserve_target_hp_bounds() -> None:
     weapon.ammunition = 100
     for _ in range(100):
         session.execute("shoot Wolf torso")
-    torso = session.combatants["wolf"].actor.body_parts[BodyPart.TORSO]
+    torso = session.combatants[_wolf_id(session)].actor.body_parts[BodyPart.TORSO]
     assert 0 <= torso.current_hp <= torso.max_hp
     assert weapon.ammunition == 0
