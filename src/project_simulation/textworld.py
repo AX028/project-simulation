@@ -7,11 +7,14 @@ import shlex
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from .ambient import AmbientAgent, AmbientNPCSimulation
 from .cognition import Belief, Mind
 from .content import create_character, create_enemy
 from .dialogue import converse
 from .models import BodyPart
+from .npc_controller import NPCController
 from .physiology import Loadout, PhysicalItem, Physiology
+from .schedules import RoutineBlock, RoutineSchedule
 from .simulation import SimulationKernel, WorldState
 from .spatial import Bounds, SpatialEntity, Vec3, observe
 from .spatial_combat import (
@@ -77,6 +80,7 @@ class TextWorldSession:
     scenery: tuple[SpatialEntity, ...] = ()
     world_items: dict[str, PhysicalItem] = field(default_factory=dict)
     kernel: SimulationKernel | None = None
+    ambient: AmbientNPCSimulation | None = None
     elapsed_seconds: float = 0.0
     transcript: list[str] = field(default_factory=list)
     seed: int | None = None
@@ -392,10 +396,29 @@ class TextWorldSession:
         already_advanced: set[str] | None = None,
     ) -> None:
         skipped = already_advanced or set()
+        ambient_ids = (
+            self.ambient.actor_ids
+            if self.ambient is not None
+            else frozenset()
+        )
+        start_world_hour = (
+            self.kernel.world.time_hours
+            if self.kernel is not None
+            else self.elapsed_seconds / 3600.0
+        )
+
         for actor_id, actor in self.actors.items():
-            if actor_id in skipped:
+            if actor_id in skipped or actor_id in ambient_ids:
                 continue
             actor.physiology.tick(seconds / 60.0, exertion=0.05)
+
+        if self.ambient is not None:
+            self.ambient.advance(
+                start_world_hour=start_world_hour,
+                seconds=seconds,
+                skip_actor_ids=frozenset(skipped),
+            )
+
         self.elapsed_seconds += seconds
         if self.kernel is not None:
             target_hour = self.kernel.world.time_hours + seconds / 3600.0
@@ -549,6 +572,27 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
             tags=frozenset({"item"}),
         ),
     )
+    mira_schedule = RoutineSchedule(
+        (
+            RoutineBlock(22.0, 6.0, "sleep", "home"),
+            RoutineBlock(6.0, 8.0, "breakfast", "home"),
+            RoutineBlock(8.0, 17.0, "work", "market"),
+            RoutineBlock(17.0, 22.0, "home", "home"),
+        )
+    )
+    mira_ambient = AmbientNPCSimulation(
+        agents={
+            "mira": AmbientAgent(
+                actor=villager_world,
+                controller=NPCController(mira_schedule),
+                locations={
+                    "home": Vec3(2.0, 2.0, 0.0),
+                    "market": Vec3(5.0, 2.0, 0.0),
+                },
+            )
+        }
+    )
+
     kernel = SimulationKernel(WorldState())
     return TextWorldSession(
         player_id=player_actor.actor_id,
@@ -573,5 +617,6 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         scenery=scenery,
         world_items={"rope": rope},
         kernel=kernel,
+        ambient=mira_ambient,
         seed=seed,
     )
