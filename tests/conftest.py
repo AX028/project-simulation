@@ -1,6 +1,5 @@
 from hypothesis import settings
 
-
 settings.register_profile(
     "deterministic-ci",
     derandomize=True,
