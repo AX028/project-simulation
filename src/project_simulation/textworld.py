@@ -12,6 +12,7 @@ from .cognition import Belief, Mind
 from .content import create_character, create_enemy
 from .dialogue import converse
 from .models import BodyPart
+from .navigation import move_actor_with_collisions
 from .npc_controller import NPCController
 from .physiology import Loadout, PhysicalItem, Physiology
 from .schedules import RoutineBlock, RoutineSchedule
@@ -154,11 +155,23 @@ class TextWorldSession:
         distance = self._positive_float(args[1] if len(args) == 2 else "1", "distance")
         destination = self.player.spatial.position + direction.scale(distance)
         seconds = distance / self.player.effective_speed()
-        moved = self.player.move_toward(destination, seconds, exertion=0.35)
+        movement = move_actor_with_collisions(
+            self.player,
+            destination,
+            seconds,
+            self.entities,
+            exertion=0.35,
+        )
         self._advance_clock(seconds, already_advanced={self.player_id})
+        blocked = (
+            ""
+            if movement.hit is None
+            else f" Movement blocked by {movement.hit.entity_id}."
+        )
         return (
-            f"You move {args[0].lower()} {moved:.2f} m. "
-            f"Position: {self._position_text(self.player.spatial.position)}",
+            f"You move {args[0].lower()} {movement.moved_distance_m:.2f} m. "
+            f"Position: {self._position_text(self.player.spatial.position)}."
+            f"{blocked}",
             False,
         )
 
@@ -171,16 +184,24 @@ class TextWorldSession:
         seconds = self._positive_float(args[1] if len(args) == 2 else "1", "seconds")
         target = self.actors[target_id]
         before = self.player.spatial.position.distance_to(target.spatial.position)
-        moved = self.player.move_toward(
+        movement = move_actor_with_collisions(
+            self.player,
             target.spatial.position,
             seconds,
+            self.entities,
             exertion=0.45,
         )
         self._advance_clock(seconds, already_advanced={self.player_id})
         after = self.player.spatial.position.distance_to(target.spatial.position)
+        blocked = (
+            ""
+            if movement.hit is None
+            else f" Blocked by {movement.hit.entity_id}."
+        )
         return (
-            f"You advance {moved:.2f} m toward {target.spatial.name}; "
-            f"distance {before:.2f} -> {after:.2f} m.",
+            f"You advance {movement.moved_distance_m:.2f} m "
+            f"toward {target.spatial.name}; "
+            f"distance {before:.2f} -> {after:.2f} m.{blocked}",
             False,
         )
 
@@ -561,7 +582,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
             Vec3(3.0, 3.0, 0.0),
             bounds=Bounds(0.4, 0.4, 0.9),
             mass_kg=35.0,
-            tags=frozenset({"cover"}),
+            tags=frozenset({"cover", "occluder", "solid"}),
         ),
         SpatialEntity(
             "rope",
