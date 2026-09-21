@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from .cognition import Memory, Mind
 from .physiology import Loadout, Physiology
+from .skills import SkillSet
 from .spatial import Observation, SpatialEntity, Vec3, VisionProfile, observe
 
 
@@ -15,6 +16,7 @@ class WorldActor:
     mind: Mind
     physiology: Physiology
     loadout: Loadout
+    skills: SkillSet = field(default_factory=SkillSet)
     vision: VisionProfile = field(default_factory=VisionProfile)
     movement_speed_mps: float = 1.4
 
