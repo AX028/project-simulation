@@ -22,7 +22,6 @@ from .cognition import (
     Mind,
     Relationship,
 )
-from .dialogue import DialogueResult, converse, disposition_toward, find_belief
 from .demographics import (
     MigrationResult,
     employed_population,
@@ -32,6 +31,7 @@ from .demographics import (
     settlement_attractiveness,
     unemployment_ratio,
 )
+from .dialogue import DialogueResult, converse, disposition_toward, find_belief
 from .diplomacy import DiplomacyEngine, Treaty, TreatyStatus
 from .economy import (
     Commodity,
