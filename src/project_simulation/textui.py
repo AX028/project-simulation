@@ -27,6 +27,7 @@ def narrative_view(
     entities: Iterable[SpatialEntity],
     *,
     illumination: float = 1.0,
+    contrast: float = 1.0,
 ) -> str:
     visible: list[Observation] = []
     all_entities = list(entities)
@@ -37,6 +38,7 @@ def narrative_view(
             observer,
             entity,
             illumination=illumination,
+            contrast=contrast,
             obstacles=all_entities,
         )
         if result is not None:
