@@ -74,6 +74,12 @@ from .physiology import (
 from .planning import Plan, PlanAction, Planner, WorldFact
 from .rumors import RumorDelivery, RumorNetwork, SocialLink
 from .schedules import RoutineBlock, RoutineDecision, RoutineSchedule
+from .settlement_dynamics import (
+    OccupationRecipe,
+    SettlementDayResult,
+    SettlementDynamics,
+    SettlementEconomicProfile,
+)
 from .simulation import (
     FactionState,
     SettlementState,
@@ -145,6 +151,10 @@ __all__ = [
     "Memory",
     "Mind",
     "Observation",
+    "SettlementEconomicProfile",
+    "SettlementDynamics",
+    "SettlementDayResult",
+    "OccupationRecipe",
     "Plan",
     "PlanAction",
     "Planner",
