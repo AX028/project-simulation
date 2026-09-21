@@ -73,6 +73,8 @@ class TextWorldSession:
     kernel: SimulationKernel | None = None
     elapsed_seconds: float = 0.0
     transcript: list[str] = field(default_factory=list)
+    seed: int | None = None
+    command_history: list[str] = field(default_factory=list)
 
     @property
     def player(self) -> WorldActor:
@@ -108,6 +110,7 @@ class TextWorldSession:
         )
         self.transcript.append(f"> {text}")
         self.transcript.append(output)
+        self.command_history.append(text)
         return result
 
     def replay(self, commands: tuple[str, ...]) -> tuple[str, ...]:
@@ -378,4 +381,5 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         rng=random.Random(seed),
         scenery=scenery,
         kernel=kernel,
+        seed=seed,
     )
