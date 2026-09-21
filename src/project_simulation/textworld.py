@@ -11,6 +11,7 @@ from .ambient import AmbientAgent, AmbientNPCSimulation
 from .cognition import Belief, Mind
 from .content import create_character, create_enemy
 from .dialogue import converse
+from .doors import Door, PassageAxis
 from .models import BodyPart
 from .navigation import move_actor_with_collisions
 from .npc_controller import NPCController
@@ -40,6 +41,8 @@ class CommandKind(StrEnum):
     DROP = "drop"
     INVENTORY = "inventory"
     TALK = "talk"
+    OPEN = "open"
+    CLOSE = "close"
     HELP = "help"
     QUIT = "quit"
 
@@ -80,6 +83,7 @@ class TextWorldSession:
     rng: random.Random
     scenery: tuple[SpatialEntity, ...] = ()
     world_items: dict[str, PhysicalItem] = field(default_factory=dict)
+    doors: dict[str, Door] = field(default_factory=dict)
     kernel: SimulationKernel | None = None
     ambient: AmbientNPCSimulation | None = None
     elapsed_seconds: float = 0.0
@@ -96,6 +100,7 @@ class TextWorldSession:
         return [
             *(actor.spatial for actor in self.actors.values()),
             *self.scenery,
+            *(door.spatial for door in self.doors.values()),
         ]
 
     def execute(self, text: str) -> CommandResult:
@@ -113,6 +118,8 @@ class TextWorldSession:
             CommandKind.DROP: self._drop,
             CommandKind.INVENTORY: self._inventory,
             CommandKind.TALK: self._talk,
+            CommandKind.OPEN: self._open,
+            CommandKind.CLOSE: self._close,
             CommandKind.HELP: self._help,
             CommandKind.QUIT: self._quit,
         }[command.kind]
@@ -160,6 +167,7 @@ class TextWorldSession:
             destination,
             seconds,
             self.entities,
+            doors=self.doors.values(),
             exertion=0.35,
         )
         self._advance_clock(seconds, already_advanced={self.player_id})
@@ -189,6 +197,7 @@ class TextWorldSession:
             target.spatial.position,
             seconds,
             self.entities,
+            doors=self.doors.values(),
             exertion=0.45,
         )
         self._advance_clock(seconds, already_advanced={self.player_id})
@@ -396,13 +405,57 @@ class TextWorldSession:
         self._advance_clock(1.0)
         return result.text, False
 
+    def _open(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        self._expect_count(args, 1, "open <door>")
+        door = self._resolve_door(args[0])
+        self._require_door_reach(door)
+        door.open_door()
+        self._advance_clock(0.5)
+        return f"You open {door.name}.", False
+
+    def _close(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        self._expect_count(args, 1, "close <door>")
+        door = self._resolve_door(args[0])
+        self._require_door_reach(door)
+        door.close_door()
+        self._advance_clock(0.5)
+        return f"You close {door.name}.", False
+
+    def _require_door_reach(self, door: Door) -> None:
+        distance = self.player.spatial.position.distance_to(door.position)
+        if distance > 1.5:
+            raise ValueError(
+                f"{door.name} is too far away to manipulate ({distance:.2f} m)"
+            )
+        observation = observe(
+            self.player.spatial,
+            door.spatial,
+            self.player.vision,
+            obstacles=self.entities,
+        )
+        if observation is None:
+            raise ValueError(f"you cannot currently perceive {door.name}")
+
+    def _resolve_door(self, query: str) -> Door:
+        lowered = query.lower()
+        matches = [
+            door
+            for door in self.doors.values()
+            if door.door_id.lower() == lowered or door.name.lower() == lowered
+        ]
+        if len(matches) != 1:
+            if not matches:
+                raise ValueError(f"unknown door: {query}")
+            raise ValueError(f"ambiguous door: {query}")
+        return matches[0]
+
     def _help(self, args: tuple[str, ...]) -> tuple[str, bool]:
         self._expect_count(args, 0, "help")
         return (
             "Commands: look, map, move <direction> [m], advance <target> [s], "
             "attack <target> [body_part], inspect <target>, wait [s], "
             "status, take <item>, drop <item>, inventory, "
-            "talk <target> [topic], help, quit.",
+            "talk <target> [topic], open <door>, close <door>, help, quit.",
             False,
         )
 
@@ -614,6 +667,15 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         }
     )
 
+    gate = Door(
+        "gate",
+        "Wooden gate",
+        Vec3(3.0, 0.0, 0.0),
+        width_m=1.1,
+        height_m=2.1,
+        axis=PassageAxis.X,
+    )
+
     kernel = SimulationKernel(WorldState())
     return TextWorldSession(
         player_id=player_actor.actor_id,
@@ -637,6 +699,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         rng=random.Random(seed),
         scenery=scenery,
         world_items={"rope": rope},
+        doors={"gate": gate},
         kernel=kernel,
         ambient=mira_ambient,
         seed=seed,
