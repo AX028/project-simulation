@@ -210,7 +210,11 @@ def move_actor_with_collisions(
             actor.spatial.position
             + displacement.normalized().scale(allowed)
         )
-    actor.physiology.tick(seconds / 60.0, exertion=exertion)
+    actor.physiology.tick(
+        seconds / 60.0,
+        exertion=exertion,
+        ambient_c=ambient_c,
+    )
     return MovementResult(
         requested,
         allowed,
