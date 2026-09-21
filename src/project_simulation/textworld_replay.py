@@ -104,6 +104,36 @@ def session_digest(session: TextWorldSession) -> str:
             }
             for actor_id, weapon in sorted(session.ranged_weapons.items())
         },
+        "sound_events": [
+            {
+                "id": event.sound_id,
+                "category": event.category,
+                "description": event.description,
+                "loudness_db_at_1m": round(event.loudness_db_at_1m, 9),
+                "created_hour": round(event.created_hour, 12),
+                "source_id": event.source_id,
+                "position": [
+                    round(event.position.x, 9),
+                    round(event.position.y, 9),
+                    round(event.position.z, 9),
+                ],
+            }
+            for event in session.sound_events
+        ],
+        "heard_memories": {
+            actor_id: [
+                {
+                    "subject": memory.subject,
+                    "proposition": memory.proposition,
+                    "confidence": round(memory.confidence, 9),
+                    "accuracy": round(memory.accuracy, 9),
+                    "created_at": round(memory.created_at, 12),
+                }
+                for memory in actor.mind.memories
+                if memory.source == "hearing"
+            ]
+            for actor_id, actor in sorted(session.actors.items())
+        },
         "kernel_time": (
             None
             if session.kernel is None
