@@ -68,6 +68,15 @@ def session_digest(session: TextWorldSession) -> str:
                 key=lambda value: value.item_id,
             )
         ],
+        "doors": {
+            door_id: {
+                "open": door.is_open,
+                "locked": door.locked,
+                "integrity": round(door.integrity, 9),
+                "destroyed": door.destroyed,
+            }
+            for door_id, door in sorted(session.doors.items())
+        },
         "world_items": {
             item_id: {
                 "name": item.name,
