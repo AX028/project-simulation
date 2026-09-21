@@ -1,5 +1,14 @@
 """Public API for Project Simulation."""
 
+from .acoustics import (
+    HeardSound,
+    HearingProfile,
+    SoundEvent,
+    count_sound_occluders,
+    distance_attenuation_db,
+    hear_sound,
+    propagate_sound,
+)
 from .ambient import AmbientAgent, AmbientEvent, AmbientNPCSimulation
 from .api import (
     CLASS_DEFINITIONS,
@@ -156,6 +165,13 @@ __all__ = [
     "CLASS_DEFINITIONS",
     "ENEMY_DEFINITIONS",
     "Action",
+    "propagate_sound",
+    "hear_sound",
+    "distance_attenuation_db",
+    "count_sound_occluders",
+    "SoundEvent",
+    "HearingProfile",
+    "HeardSound",
     "AmbientNPCSimulation",
     "AmbientEvent",
     "AmbientAgent",
