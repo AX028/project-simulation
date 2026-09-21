@@ -162,7 +162,11 @@ class SettlementDynamics:
         if interval_hours <= 0:
             raise ValueError("interval_hours must be positive")
 
-        event_kind = "settlement_dynamics_day"
+        event_kind = "daily_settlement"
+        if kernel.has_handler(event_kind):
+            raise ValueError(
+                "daily settlement dynamics are already bound to this kernel"
+            )
 
         def handler(world: WorldState, event: ScheduledEvent) -> None:
             del world
