@@ -7,7 +7,7 @@ import shlex
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from .acoustics import HearingProfile, HeardSound, SoundEvent, propagate_sound
+from .acoustics import HeardSound, HearingProfile, SoundEvent, propagate_sound
 from .ambient import AmbientAgent, AmbientNPCSimulation
 from .cognition import Belief, Memory, Mind
 from .content import create_character, create_enemy
