@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from typing import TYPE_CHECKING
 
 from .ambient import AmbientAgent, AmbientNPCSimulation
 from .cognition import Belief, Mind
@@ -19,8 +20,11 @@ from .spatial import Bounds, SpatialEntity, Vec3
 from .spatial_combat import SpatialCombatant, WeaponPhysics
 from .worldstate import WorldActor
 
+if TYPE_CHECKING:
+    from .textworld import TextWorldSession
 
-def build_demo_session(seed: int = 42):
+
+def build_demo_session(seed: int = 42) -> TextWorldSession:
     from .textworld import TextWorldSession
 
     player_actor = create_character("ranger", "Aster", seed)
