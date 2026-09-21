@@ -7,7 +7,52 @@ from math import sqrt
 
 from .models import Actor, Armor, BodyPart
 from .physiology import Injury, InjuryType, Physiology
-from .projectiles import ProjectileHit
+from .projectiles import (
+    Projectile,
+    ProjectileHit,
+    ProjectileSpec,
+    launch_velocity,
+)
+from .spatial import Vec3
+
+
+@dataclass(slots=True)
+class RangedWeapon:
+    name: str
+    projectile_spec: ProjectileSpec
+    muzzle_speed_mps: float
+    ammunition: int
+    penetration_factor: float = 1.0
+    shots_fired: int = 0
+
+    def __post_init__(self) -> None:
+        if self.muzzle_speed_mps <= 0:
+            raise ValueError("muzzle speed must be positive")
+        if self.ammunition < 0:
+            raise ValueError("ammunition may not be negative")
+        if self.penetration_factor <= 0:
+            raise ValueError("penetration_factor must be positive")
+
+    def fire(
+        self,
+        *,
+        owner_id: str,
+        origin: Vec3,
+        direction: Vec3,
+    ) -> Projectile:
+        if self.ammunition <= 0:
+            raise ValueError(f"{self.name} is out of ammunition")
+        projectile_id = f"{owner_id}:{self.name}:{self.shots_fired}"
+        projectile = Projectile(
+            projectile_id=projectile_id,
+            spec=self.projectile_spec,
+            position=origin,
+            velocity=launch_velocity(direction, self.muzzle_speed_mps),
+            owner_id=owner_id,
+        )
+        self.ammunition -= 1
+        self.shots_fired += 1
+        return projectile
 
 
 @dataclass(frozen=True, slots=True)
