@@ -32,6 +32,18 @@ def session_digest(session: TextWorldSession) -> str:
                 "blood_lost_ml": round(actor.physiology.blood_lost_ml, 9),
                 "hydration_l": round(actor.physiology.hydration_l, 9),
                 "core_temperature_c": round(actor.physiology.core_temperature_c, 9),
+                "skills": {
+                    skill_id: {
+                        "knowledge": round(skill.knowledge, 9),
+                        "technique": round(skill.technique, 9),
+                        "automaticity": round(skill.automaticity, 9),
+                        "experience_hours": round(skill.experience_hours, 12),
+                        "practice_counts": dict(
+                            sorted(skill.practice_counts.items())
+                        ),
+                    }
+                    for skill_id, skill in sorted(actor.skills.skills.items())
+                },
                 "injuries": [
                     {
                         "location": injury.location,
