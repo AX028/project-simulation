@@ -125,6 +125,14 @@ from .simulation import (
     SimulationLOD,
     WorldState,
 )
+from .skills import (
+    PracticeEvent,
+    PracticeResult,
+    SkillGain,
+    SkillSet,
+    SkillState,
+    default_skill_transfers,
+)
 from .spatial import (
     Bounds,
     Observation,
@@ -260,6 +268,12 @@ __all__ = [
     "Physiology",
     "PlayerCharacter",
     "Relationship",
+    "default_skill_transfers",
+    "SkillState",
+    "SkillSet",
+    "SkillGain",
+    "PracticeResult",
+    "PracticeEvent",
     "resolve_projectile_impact",
     "aim_point_for_body_part",
     "RangedWeapon",
