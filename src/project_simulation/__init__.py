@@ -50,6 +50,7 @@ from .information import (
     transmission_confidence,
     transmit_claim,
 )
+from .lod import AbstractActorState, ActorLODManager, abstract_actor, restore_actor
 from .models import (
     Action,
     Actor,
@@ -111,6 +112,10 @@ __all__ = [
     "CLASS_DEFINITIONS",
     "ENEMY_DEFINITIONS",
     "Action",
+    "restore_actor",
+    "abstract_actor",
+    "ActorLODManager",
+    "AbstractActorState",
     "NPCController",
     "GoalRequest",
     "AgentDirective",
