@@ -1,0 +1,135 @@
+"""Event-sourced save/load for deterministic text-world sessions."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+from .models import IncompatibleSaveError
+from .textworld import TextWorldSession, build_demo_session
+
+TEXTWORLD_REPLAY_SCHEMA_VERSION = 1
+
+
+def session_digest(session: TextWorldSession) -> str:
+    payload: dict[str, Any] = {
+        "elapsed_seconds": round(session.elapsed_seconds, 9),
+        "actors": {
+            actor_id: {
+                "position": [
+                    round(actor.spatial.position.x, 9),
+                    round(actor.spatial.position.y, 9),
+                    round(actor.spatial.position.z, 9),
+                ],
+                "velocity": [
+                    round(actor.spatial.velocity.x, 9),
+                    round(actor.spatial.velocity.y, 9),
+                    round(actor.spatial.velocity.z, 9),
+                ],
+                "fatigue": round(actor.physiology.fatigue, 9),
+                "blood_lost_ml": round(actor.physiology.blood_lost_ml, 9),
+                "hydration_l": round(actor.physiology.hydration_l, 9),
+                "core_temperature_c": round(actor.physiology.core_temperature_c, 9),
+                "injuries": [
+                    {
+                        "location": injury.location,
+                        "type": injury.injury_type.value,
+                        "severity": round(injury.severity, 9),
+                        "bleeding": round(injury.bleeding_ml_per_min, 9),
+                        "pain": round(injury.pain, 9),
+                    }
+                    for injury in actor.physiology.injuries
+                ],
+            }
+            for actor_id, actor in sorted(session.actors.items())
+        },
+        "combat": {
+            actor_id: {
+                part.value: body.current_hp
+                for part, body in sorted(
+                    combatant.actor.body_parts.items(),
+                    key=lambda item: item[0].value,
+                )
+            }
+            for actor_id, combatant in sorted(session.combatants.items())
+        },
+        "kernel_time": (
+            None
+            if session.kernel is None
+            else round(session.kernel.world.time_hours, 12)
+        ),
+        "transcript": list(session.transcript),
+        "commands": list(session.command_history),
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+class TextWorldReplayStore:
+    @staticmethod
+    def write(session: TextWorldSession, path: str | Path) -> None:
+        if session.seed is None:
+            raise ValueError("session seed is required for deterministic replay saves")
+
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "schema_version": TEXTWORLD_REPLAY_SCHEMA_VERSION,
+            "seed": session.seed,
+            "commands": list(session.command_history),
+            "digest": session_digest(session),
+        }
+        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(data, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        temporary.replace(destination)
+
+    @staticmethod
+    def read(path: str | Path) -> TextWorldSession:
+        try:
+            raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise IncompatibleSaveError(
+                f"could not read text-world replay: {exc}"
+            ) from exc
+
+        if not isinstance(raw, dict):
+            raise IncompatibleSaveError("text-world replay root must be an object")
+        version = raw.get("schema_version")
+        if version != TEXTWORLD_REPLAY_SCHEMA_VERSION:
+            raise IncompatibleSaveError(
+                f"unsupported text-world replay schema: {version}"
+            )
+
+        try:
+            seed = int(raw["seed"])
+            commands_raw = raw["commands"]
+            expected_digest = str(raw["digest"])
+            if not isinstance(commands_raw, list):
+                raise TypeError("commands must be a list")
+            if not all(isinstance(command, str) for command in commands_raw):
+                raise TypeError("every command must be a string")
+
+            session = build_demo_session(seed)
+            session.replay(tuple(commands_raw))
+            actual_digest = session_digest(session)
+            if actual_digest != expected_digest:
+                raise IncompatibleSaveError(
+                    "replayed session does not match stored state digest"
+                )
+            return session
+        except IncompatibleSaveError:
+            raise
+        except (KeyError, TypeError, ValueError) as exc:
+            raise IncompatibleSaveError(
+                f"malformed text-world replay payload: {exc}"
+            ) from exc
