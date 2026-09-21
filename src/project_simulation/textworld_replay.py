@@ -94,6 +94,16 @@ def session_digest(session: TextWorldSession) -> str:
             ]
             for entity in sorted(session.scenery, key=lambda value: value.entity_id)
         },
+        "ranged_weapons": {
+            actor_id: {
+                "name": weapon.name,
+                "ammunition": weapon.ammunition,
+                "shots_fired": weapon.shots_fired,
+                "muzzle_speed_mps": round(weapon.muzzle_speed_mps, 9),
+                "penetration_factor": round(weapon.penetration_factor, 9),
+            }
+            for actor_id, weapon in sorted(session.ranged_weapons.items())
+        },
         "kernel_time": (
             None
             if session.kernel is None
