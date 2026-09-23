@@ -268,7 +268,10 @@ class TextWorldSession:
         self.elapsed_seconds += seconds
         self.environment.advance(seconds / 3600.0)
         if self.kernel is not None:
-            target_hour = self.elapsed_seconds / 3600.0
+            target_hour = round(
+                self.kernel.world.time_hours + seconds / 3600.0,
+                12,
+            )
             self.kernel.advance_to(target_hour)
 
     def _resolve_actor(self, query: str) -> str:
