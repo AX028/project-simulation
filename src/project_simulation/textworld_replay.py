@@ -1,4 +1,17 @@
-"""Event-sourced save/load for deterministic text-world sessions."""
+"""Event-sourced save/load for deterministic text-world sessions.
+
+Schema 2 digests authenticate the authoritative environment fields and each
+actor's skill configuration (learning rate, baseline level, and transfer
+weights). Derived environment properties are omitted. Transfer mappings are
+compared by key, so insertion order does not change identity.
+
+The store still rebuilds ``build_demo_session(seed)`` and replays commands.
+It does not store arbitrary sessions. Out-of-band mutation and custom
+initial state are rejected at write time. Schema 1 saves still load, and
+their digests keep the original field set: they do not authenticate
+environment or skill configuration, and they are not checked with schema 2
+rules.
+"""
 
 from __future__ import annotations
 
@@ -10,10 +23,32 @@ from typing import Any
 from .models import IncompatibleSaveError
 from .textworld import TextWorldSession, build_demo_session
 
-TEXTWORLD_REPLAY_SCHEMA_VERSION = 1
+TEXTWORLD_REPLAY_SCHEMA_VERSION = 2
 
 
-def session_digest(session: TextWorldSession) -> str:
+def session_digest(
+    session: TextWorldSession,
+    *,
+    schema_version: int = TEXTWORLD_REPLAY_SCHEMA_VERSION,
+) -> str:
+    if schema_version not in (1, TEXTWORLD_REPLAY_SCHEMA_VERSION):
+        raise ValueError(
+            f"unsupported text-world replay schema: {schema_version}"
+        )
+    payload = _digest_payload(session, schema_version)
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _digest_payload(
+    session: TextWorldSession,
+    schema_version: int,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "elapsed_seconds": round(session.elapsed_seconds, 9),
         "actors": {
@@ -154,13 +189,10 @@ def session_digest(session: TextWorldSession) -> str:
         "transcript": list(session.transcript),
         "commands": list(session.command_history),
     }
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    if schema_version >= 2:
+        payload["environment"] = _environment_identity(session)
+        payload["skill_configuration"] = _skill_configuration(session)
+    return payload
 
 
 class TextWorldReplayStore:
@@ -168,6 +200,14 @@ class TextWorldReplayStore:
     def write(session: TextWorldSession, path: str | Path) -> None:
         if session.seed is None:
             raise ValueError("session seed is required for deterministic replay saves")
+        reproduced = build_demo_session(session.seed)
+        reproduced.replay(tuple(session.command_history))
+        if session_digest(reproduced) != session_digest(session):
+            raise ValueError(
+                "text-world replay cannot represent custom initial state or "
+                "out-of-band mutation; only the demo seed and command history "
+                "are stored"
+            )
 
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +236,11 @@ class TextWorldReplayStore:
         if not isinstance(raw, dict):
             raise IncompatibleSaveError("text-world replay root must be an object")
         version = raw.get("schema_version")
-        if version != TEXTWORLD_REPLAY_SCHEMA_VERSION:
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version not in (1, TEXTWORLD_REPLAY_SCHEMA_VERSION)
+        ):
             raise IncompatibleSaveError(
                 f"unsupported text-world replay schema: {version}"
             )
@@ -212,7 +256,7 @@ class TextWorldReplayStore:
 
             session = build_demo_session(seed)
             session.replay(tuple(commands_raw))
-            actual_digest = session_digest(session)
+            actual_digest = session_digest(session, schema_version=version)
             if actual_digest != expected_digest:
                 raise IncompatibleSaveError(
                     "replayed session does not match stored state digest"
@@ -224,3 +268,39 @@ class TextWorldReplayStore:
             raise IncompatibleSaveError(
                 f"malformed text-world replay payload: {exc}"
             ) from exc
+
+
+def _environment_identity(session: TextWorldSession) -> dict[str, Any]:
+    environment = session.environment
+    wind = environment.wind_velocity
+    return {
+        "world_hour": round(environment.world_hour, 12),
+        "weather": environment.weather.value,
+        "base_temperature_c": round(environment.base_temperature_c, 9),
+        "wind_velocity": [
+            round(wind.x, 9),
+            round(wind.y, 9),
+            round(wind.z, 9),
+        ],
+        "precipitation": round(environment.precipitation, 9),
+        "cloud_cover": round(environment.cloud_cover, 9),
+        "fog_density": round(environment.fog_density, 9),
+        "ground_wetness": round(environment.ground_wetness, 9),
+    }
+
+
+def _skill_configuration(session: TextWorldSession) -> dict[str, Any]:
+    return {
+        actor_id: {
+            "learning_rate": round(actor.skills.learning_rate, 12),
+            "baseline_level": round(actor.skills.baseline_level, 9),
+            "transfers": {
+                source: {
+                    target: round(weight, 9)
+                    for target, weight in sorted(mapping.items())
+                }
+                for source, mapping in sorted(actor.skills.transfers.items())
+            },
+        }
+        for actor_id, actor in sorted(session.actors.items())
+    }
