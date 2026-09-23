@@ -41,12 +41,16 @@ def save_game(state: GameState, path: str | Path) -> None:
 def load_game(path: str | Path) -> GameState:
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise IncompatibleSaveError("save root must be an object")
         if payload.get("schema_version") != SAVE_SCHEMA_VERSION:
             raise IncompatibleSaveError(
                 "save schema "
                 f"{payload.get('schema_version')!r} is unsupported; expected {SAVE_SCHEMA_VERSION}"
             )
         player_data = payload["player"]
+        if not isinstance(player_data, dict):
+            raise IncompatibleSaveError("save player must be an object")
         player = create_character(player_data["class_id"], player_data["name"], payload["seed"])
         player.level = int(player_data["level"])
         player.experience = int(player_data["experience"])
@@ -73,7 +77,14 @@ def load_game(path: str | Path) -> GameState:
         )
     except IncompatibleSaveError:
         raise
-    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (
+        OSError,
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         raise IncompatibleSaveError(f"could not load save: {exc}") from exc
 
 

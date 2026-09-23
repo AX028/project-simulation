@@ -11,6 +11,7 @@ from .content import CLASS_DEFINITIONS, ENEMY_DEFINITIONS, create_character, cre
 from .decision import UtilityDecisionPolicy
 from .models import EncounterState, GameState, SimulationError, WorldConfig
 from .persistence import load_game, save_game
+from .textworld import build_demo_session
 from .world import WorldStore, generate_world
 
 
@@ -40,6 +41,14 @@ def _parser() -> argparse.ArgumentParser:
     world.add_argument("--width", type=int, default=64)
     world.add_argument("--height", type=int, default=64)
     world.add_argument("--chunk-size", type=int, default=16)
+    explore = sub.add_parser("explore", help="explore the WORLDSTATE text-world demo")
+    explore.add_argument("--seed", type=int, default=42)
+    explore.add_argument(
+        "--command",
+        action="append",
+        default=[],
+        help="execute a command non-interactively; may be repeated",
+    )
     return parser
 
 
@@ -79,6 +88,38 @@ def _play(args: argparse.Namespace, state: GameState | None = None) -> int:
     return 0
 
 
+
+def _explore(args: argparse.Namespace) -> int:
+    session = build_demo_session(args.seed)
+    commands: list[str] = list(args.command)
+    if commands:
+        for command in commands:
+            print(f"> {command}")
+            result = session.execute(command)
+            print(result.output)
+            if result.quit:
+                break
+        return 0
+
+    print("WORLDSTATE demo. Type 'help' for commands and 'quit' to exit.")
+    while True:
+        try:
+            command = input("> ")
+        except EOFError:
+            print()
+            return 0
+        if not command.strip():
+            continue
+        try:
+            result = session.execute(command)
+        except ValueError as exc:
+            print(f"error: {exc}")
+            continue
+        print(result.output)
+        if result.quit:
+            return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -95,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
             WorldStore.write(world, args.path)
             print(f"Stored {args.width}x{args.height} world at {args.path}")
             return 0
+        if args.command == "explore":
+            return _explore(args)
         if args.command == "inspect":
             state = load_game(args.save)
             print(

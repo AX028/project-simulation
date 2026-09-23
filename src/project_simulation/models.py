@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
 
+from .validation import nonnegative_number, positive_number
+
 
 class SimulationError(Exception):
     """Base exception for expected simulation errors."""
@@ -79,16 +81,24 @@ class ResourcePool:
     current: int
     maximum: int
 
+    def __post_init__(self) -> None:
+        positive_number(self.maximum, "resource maximum")
+        nonnegative_number(self.current, "resource current")
+        if self.current > self.maximum:
+            raise ValueError("resource current may not exceed maximum")
+
     @property
     def ratio(self) -> float:
         return self.current / self.maximum if self.maximum else 0.0
 
     def spend(self, amount: int) -> None:
+        nonnegative_number(amount, "resource spend")
         if amount > self.current:
             raise IllegalActionError("not enough resources")
         self.current -= amount
 
     def restore(self, amount: int) -> int:
+        nonnegative_number(amount, "resource restore")
         before = self.current
         self.current = min(self.maximum, self.current + amount)
         return self.current - before
@@ -262,6 +272,11 @@ class WorldConfig:
     width: int = 64
     height: int = 64
     chunk_size: int = 16
+
+    def __post_init__(self) -> None:
+        positive_number(self.width, "world width")
+        positive_number(self.height, "world height")
+        positive_number(self.chunk_size, "world chunk size")
 
 
 @dataclass(slots=True)
