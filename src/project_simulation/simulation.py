@@ -115,6 +115,12 @@ class SimulationKernel:
             handler(self.world, event)
         self.world.time_hours = target_hour
 
+    def next_event_sequence(self) -> int:
+        """Return the sequence number the next scheduled event will receive."""
+        upcoming = next(self._counter)
+        self._counter = count(upcoming)
+        return upcoming
+
     def pending_events(self) -> tuple[ScheduledEvent, ...]:
         """Return an immutable, sorted copy of future scheduled events."""
         return tuple(
@@ -127,8 +133,19 @@ class SimulationKernel:
             for event in sorted(self._events)
         )
 
-    def replace_pending_events(self, events: Iterable[ScheduledEvent]) -> None:
-        """Replace the queue while preserving deterministic sequence ordering."""
+    def replace_pending_events(
+        self,
+        events: Iterable[ScheduledEvent],
+        *,
+        next_sequence: int | None = None,
+    ) -> None:
+        """Replace the queue while preserving deterministic sequence ordering.
+
+        ``next_sequence`` is the number the following ``schedule`` call uses.
+        When omitted, it is one past the highest pending sequence. It must not
+        collide with a sequence still in the queue. Validation happens before
+        the live queue is replaced.
+        """
         restored = [
             ScheduledEvent(
                 event.at,
@@ -146,10 +163,25 @@ class SimulationKernel:
         sequences = [event.sequence for event in restored]
         if len(sequences) != len(set(sequences)):
             raise ValueError("pending event sequence numbers must be unique")
+        inferred = max(sequences, default=-1) + 1
+        if next_sequence is None:
+            chosen = inferred
+        else:
+            if isinstance(next_sequence, bool) or not isinstance(
+                next_sequence,
+                int,
+            ):
+                raise TypeError("next event sequence must be an integer")
+            if next_sequence < 0:
+                raise ValueError("next event sequence may not be negative")
+            if next_sequence < inferred:
+                raise ValueError(
+                    "next event sequence collides with a pending event"
+                )
+            chosen = next_sequence
         self._events = restored
         heapify(self._events)
-        next_sequence = max(sequences, default=-1) + 1
-        self._counter = count(next_sequence)
+        self._counter = count(chosen)
 
     def choose_lod(self, distance_m: float, important: bool = False) -> SimulationLOD:
         distance_m = nonnegative_number(distance_m, "LOD distance")

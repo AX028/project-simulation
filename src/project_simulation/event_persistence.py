@@ -12,6 +12,44 @@ from .simulation import EventValue, ScheduledEvent, SimulationKernel
 EVENT_QUEUE_SCHEMA_VERSION = 1
 
 
+def scheduled_event_payload(event: ScheduledEvent) -> dict[str, Any]:
+    """Return the stored mapping for one scheduled event."""
+    return {
+        "at": event.at,
+        "sequence": event.sequence,
+        "kind": event.kind,
+        "payload": dict(sorted(event.payload.items())),
+    }
+
+
+def scheduled_event_from_payload(raw: object) -> ScheduledEvent:
+    """Rebuild one scheduled event from ``scheduled_event_payload``."""
+    if not isinstance(raw, dict):
+        raise TypeError("event must be an object")
+    payload_raw = raw["payload"]
+    if not isinstance(payload_raw, dict):
+        raise TypeError("event payload must be an object")
+
+    payload: dict[str, EventValue] = {}
+    for key, value in payload_raw.items():
+        if not isinstance(key, str):
+            raise TypeError("event payload keys must be strings")
+        if not isinstance(value, (str, int, float, bool)):
+            raise TypeError("unsupported event payload value")
+        payload[key] = value
+
+    kind = raw["kind"]
+    if not isinstance(kind, str) or not kind:
+        raise TypeError("event kind must be a non-empty string")
+
+    return ScheduledEvent(
+        at=float(raw["at"]),
+        sequence=int(raw["sequence"]),
+        kind=kind,
+        payload=payload,
+    )
+
+
 class EventQueueStore:
     @staticmethod
     def write(kernel: SimulationKernel, path: str | Path) -> None:
@@ -21,12 +59,7 @@ class EventQueueStore:
             "schema_version": EVENT_QUEUE_SCHEMA_VERSION,
             "world_time_hours": kernel.world.time_hours,
             "events": [
-                {
-                    "at": event.at,
-                    "sequence": event.sequence,
-                    "kind": event.kind,
-                    "payload": dict(sorted(event.payload.items())),
-                }
+                scheduled_event_payload(event)
                 for event in kernel.pending_events()
             ],
         }
@@ -69,7 +102,7 @@ class EventQueueStore:
                 raise TypeError("events must be a list")
 
             events = tuple(
-                EventQueueStore._event_from_raw(item)
+                scheduled_event_from_payload(item)
                 for item in raw_events
             )
             kernel.replace_pending_events(events)
@@ -83,27 +116,4 @@ class EventQueueStore:
 
     @staticmethod
     def _event_from_raw(raw: object) -> ScheduledEvent:
-        if not isinstance(raw, dict):
-            raise TypeError("event must be an object")
-        payload_raw = raw["payload"]
-        if not isinstance(payload_raw, dict):
-            raise TypeError("event payload must be an object")
-
-        payload: dict[str, EventValue] = {}
-        for key, value in payload_raw.items():
-            if not isinstance(key, str):
-                raise TypeError("event payload keys must be strings")
-            if not isinstance(value, (str, int, float, bool)):
-                raise TypeError("unsupported event payload value")
-            payload[key] = value
-
-        kind = raw["kind"]
-        if not isinstance(kind, str) or not kind:
-            raise TypeError("event kind must be a non-empty string")
-
-        return ScheduledEvent(
-            at=float(raw["at"]),
-            sequence=int(raw["sequence"]),
-            kind=kind,
-            payload=payload,
-        )
+        return scheduled_event_from_payload(raw)
