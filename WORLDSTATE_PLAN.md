@@ -28,6 +28,8 @@ The validation runner is `scripts/validate.py`.
   direction, and hearing-derived memories.
 - Deterministic 3D projectiles with mass, gravity, drag, lifetime, impact energy, owner exclusion,
   and swept collision.
+- Shared time-of-day, weather, wind, precipitation, and temperature state drives vision,
+  projectiles, sound, movement, and physiology.
 
 ### Characters, combat, and survival
 - Original body-part combat plus true spatial weapon reach.
@@ -38,6 +40,8 @@ The validation runner is `scripts/validate.py`.
 - Openable scene containers with constrained storage, explicit access time, and take/put flows.
 - Ranged weapons, ammunition, anatomical aiming, obstruction/interception, door damage, and
   projectile wounds.
+- Deterministic skill progression with difficulty, novelty, training modes, cross-skill transfer,
+  and physiology/context-sensitive performance.
 
 ### NPC cognition and social systems
 - Objective reality separated from NPC knowledge and belief.
@@ -63,20 +67,17 @@ The validation runner is `scripts/validate.py`.
   OPEN, CLOSE, SHOOT, HELP, and QUIT.
 - Real time advancement drives physiology, ambient NPC routines, and macro events.
 - Event-sourced deterministic replay saves with state digests and tamper detection.
-- Replay digest currently covers actor/combat state, inventory/world items, doors, ranged weapons,
-  sound events, heard memories, scenery, time, transcript, and command history.
+- Replay digest currently covers actor/combat/skill state, inventory/world/scene-container items,
+  doors, ranged weapons, sound events, heard memories, scenery, time, transcript, and command
+  history.
 
 ## Current implementation priorities
 
-1. Environmental state: time-of-day light, weather, wind, precipitation, and temperature as shared
-   inputs to vision, projectile drift, sound, movement, and physiology.
-2. Skills/progression: use/training/instruction gains with difficulty, novelty, transfer, and
-   performance derived from skill + physiology + context.
-3. More complete world-object interaction: breaking objects and construction/destruction.
-4. Automatic macro coupling: settlement production, migration, faction activity, and information
-   propagation driven continuously by event schedules.
-5. Higher-detail persistence/checkpoints so very long replay histories can compact safely.
-6. Larger authored/procedural prototype region with several buildings, professions, wildlife, and
+1. More complete world-object interaction: breaking objects and construction/destruction.
+2. Playable macro coupling: wire settlement production, migration, faction activity, and
+   information propagation schedules into text-world sessions and replay digests.
+3. Higher-detail persistence/checkpoints so very long replay histories can compact safely.
+4. Larger authored/procedural prototype region with several buildings, professions, wildlife, and
    competing factions.
 
 ## Testing strategy

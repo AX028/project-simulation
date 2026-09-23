@@ -30,6 +30,8 @@ machine-learning runtime is required.
 The current branch includes:
 
 - true XYZ spatial entities with dimensions, facing, velocity, visibility, elevation, and LOS;
+- shared time-of-day and weather state affecting vision, sound, movement, projectiles, and
+  physiology;
 - swept movement collision, solid cover, doors, passage clearance, and oversized-actor rejection;
 - deterministic projectile trajectories with gravity, drag, lifetime, anti-tunneling sweeps, and
   anatomical ranged impacts;
@@ -37,6 +39,7 @@ The current branch includes:
   location-specific injuries;
 - physical inventory based on mass, volume, containers, accessibility, and encumbrance;
 - openable scene containers with capacity-constrained take/put interactions;
+- deterministic skill practice, training modes, novelty, transfer, and contextual performance;
 - NPC beliefs separated from objective truth, selective memories, multidimensional relationships,
   utility decisions, GOAP planning, routines, and ambient world movement;
 - delayed rumor propagation and belief-grounded dialogue;
