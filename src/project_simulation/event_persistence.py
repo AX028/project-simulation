@@ -68,10 +68,7 @@ class EventQueueStore:
             if not isinstance(raw_events, list):
                 raise TypeError("events must be a list")
 
-            events = tuple(
-                EventQueueStore._event_from_raw(item)
-                for item in raw_events
-            )
+            events = tuple(event_from_mapping(item) for item in raw_events)
             kernel.replace_pending_events(events)
             return kernel.pending_events()
         except IncompatibleSaveError:
@@ -83,27 +80,31 @@ class EventQueueStore:
 
     @staticmethod
     def _event_from_raw(raw: object) -> ScheduledEvent:
-        if not isinstance(raw, dict):
-            raise TypeError("event must be an object")
-        payload_raw = raw["payload"]
-        if not isinstance(payload_raw, dict):
-            raise TypeError("event payload must be an object")
+        return event_from_mapping(raw)
 
-        payload: dict[str, EventValue] = {}
-        for key, value in payload_raw.items():
-            if not isinstance(key, str):
-                raise TypeError("event payload keys must be strings")
-            if not isinstance(value, (str, int, float, bool)):
-                raise TypeError("unsupported event payload value")
-            payload[key] = value
 
-        kind = raw["kind"]
-        if not isinstance(kind, str) or not kind:
-            raise TypeError("event kind must be a non-empty string")
+def event_from_mapping(raw: object) -> ScheduledEvent:
+    if not isinstance(raw, dict):
+        raise TypeError("event must be an object")
+    payload_raw = raw["payload"]
+    if not isinstance(payload_raw, dict):
+        raise TypeError("event payload must be an object")
 
-        return ScheduledEvent(
-            at=float(raw["at"]),
-            sequence=int(raw["sequence"]),
-            kind=kind,
-            payload=payload,
-        )
+    payload: dict[str, EventValue] = {}
+    for key, value in payload_raw.items():
+        if not isinstance(key, str):
+            raise TypeError("event payload keys must be strings")
+        if not isinstance(value, (str, int, float, bool)):
+            raise TypeError("unsupported event payload value")
+        payload[key] = value
+
+    kind = raw["kind"]
+    if not isinstance(kind, str) or not kind:
+        raise TypeError("event kind must be a non-empty string")
+
+    return ScheduledEvent(
+        at=float(raw["at"]),
+        sequence=int(raw["sequence"]),
+        kind=kind,
+        payload=payload,
+    )

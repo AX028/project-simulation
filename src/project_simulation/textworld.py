@@ -24,7 +24,7 @@ from .textworld_commands import (
     ParsedCommand,
     parse_command,
 )
-from .validation import positive_number
+from .validation import finite_number, positive_number
 from .worldstate import WorldActor
 
 
@@ -211,12 +211,37 @@ class TextWorldSession:
 
         return quit_session(self, args)
 
+    def _align_environment_clock(self) -> None:
+        """Realign the environment hour to kernel time before a command samples it.
+
+        Kernel world time is authoritative for an advancing step when a kernel
+        is attached. Commands that read temperature or movement before
+        ``_advance_clock`` must call this first so the player and other actors
+        share one pre-step hour. ``elapsed_seconds`` is session elapsed time and
+        is left unchanged.
+        """
+        if self.kernel is not None:
+            self.environment.world_hour = self.kernel.world.time_hours
+
     def _advance_clock(
         self,
         seconds: float,
         *,
         already_advanced: set[str] | None = None,
     ) -> None:
+        """Advance the session, environment, and kernel clocks by ``seconds``.
+
+        The duration is validated before any clock is written. When a kernel is
+        attached, the environment hour is realigned to kernel time and that
+        hour is the pre-step sample for physiology and ambient movement.
+        ``elapsed_seconds`` accumulates this duration; it is not rewritten from
+        the kernel. Weather and physiology use an explicit Euler step, so one
+        long advance is not required to match the same interval split apart.
+        """
+        seconds = finite_number(seconds, "elapsed seconds")
+        if seconds < 0:
+            raise ValueError("elapsed seconds may not be negative")
+
         skipped = already_advanced or set()
         ambient_ids = (
             self.ambient.actor_ids
@@ -228,6 +253,7 @@ class TextWorldSession:
             if self.kernel is not None
             else self.elapsed_seconds / 3600.0
         )
+        finite_number(start_world_hour, "world hour")
 
         self.environment.world_hour = start_world_hour
         ambient_c = self.environment.ambient_temperature_c

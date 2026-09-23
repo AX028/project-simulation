@@ -36,6 +36,7 @@ def move(
         args[1] if len(args) == 2 else "1",
         "distance",
     )
+    session._align_environment_clock()
     session.player.spatial.facing = direction
     destination = session.player.spatial.position + direction.scale(
         distance

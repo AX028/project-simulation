@@ -63,6 +63,7 @@ from .information import (
     transmit_claim,
 )
 from .lod import AbstractActorState, ActorLODManager, abstract_actor, restore_actor
+from .macro_checkpoint import MacroCheckpointStore
 from .models import (
     Action,
     Actor,
@@ -165,7 +166,11 @@ from .textworld import (
     build_demo_session,
     parse_command,
 )
-from .textworld_replay import TextWorldReplayStore, session_digest
+from .textworld_replay import (
+    TextWorldReplayStore,
+    session_digest,
+    session_digest_v1,
+)
 from .worldstate import WorldActor
 from .worldstate_persistence import WorldStateStore
 
@@ -213,6 +218,7 @@ __all__ = [
     "build_demo_session",
     "TextWorldSession",
     "session_digest",
+    "session_digest_v1",
     "TextWorldReplayStore",
     "ParsedCommand",
     "CommandResult",
@@ -233,6 +239,7 @@ __all__ = [
     "DiplomacyEngine",
     "EmotionState",
     "EventQueueStore",
+    "MacroCheckpointStore",
     "EncounterResult",
     "EncounterState",
     "FactionState",

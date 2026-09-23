@@ -7,6 +7,14 @@ from enum import StrEnum
 from math import cos, pi, sin
 
 from .spatial import Vec3
+from .validation import bounded_number, finite_number
+
+_UNIT_INTERVAL_FIELDS = (
+    "precipitation",
+    "cloud_cover",
+    "fog_density",
+    "ground_wetness",
+)
 
 
 class WeatherKind(StrEnum):
@@ -29,11 +37,21 @@ class EnvironmentState:
     fog_density: float = 0.0
     ground_wetness: float = 0.0
 
-    def __post_init__(self) -> None:
-        for name in ("precipitation", "cloud_cover", "fog_density", "ground_wetness"):
-            value = float(getattr(self, name))
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(f"{name} must be between zero and one")
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in _UNIT_INTERVAL_FIELDS:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be a real number")
+            value = bounded_number(value, name, 0.0, 1.0)
+        elif name in ("world_hour", "base_temperature_c"):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be a real number")
+            label = "world hour" if name == "world_hour" else "base temperature"
+            value = finite_number(value, label)
+        elif name == "weather" and not isinstance(value, WeatherKind):
+            raise ValueError("weather must be a WeatherKind")
+        elif name == "wind_velocity" and not isinstance(value, Vec3):
+            raise TypeError("wind_velocity must be a Vec3")
+        object.__setattr__(self, name, value)
 
     @property
     def hour_of_day(self) -> float:
@@ -133,6 +151,7 @@ class EnvironmentState:
         )
 
     def advance(self, hours: float) -> None:
+        hours = finite_number(hours, "environment hours")
         if hours < 0:
             raise ValueError("environment time may not move backward")
         if hours == 0:

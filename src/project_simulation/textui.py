@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from .spatial import Observation, SpatialEntity, Vec3, observe
+from .spatial import Observation, SpatialEntity, Vec3, VisionProfile, observe
 
 
 def render_observations(observations: Iterable[Observation]) -> str:
@@ -28,6 +28,7 @@ def narrative_view(
     *,
     illumination: float = 1.0,
     contrast: float = 1.0,
+    vision: VisionProfile | None = None,
 ) -> str:
     visible: list[Observation] = []
     all_entities = list(entities)
@@ -37,6 +38,7 @@ def narrative_view(
         result = observe(
             observer,
             entity,
+            vision,
             illumination=illumination,
             contrast=contrast,
             obstacles=all_entities,

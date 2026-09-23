@@ -55,15 +55,22 @@ The validation runner is `scripts/validate.py`.
 - Commodity production, demand/supply pricing, trade routes, transport cost, and risk.
 - Employment response, attractiveness, and population-conserving migration.
 - Factions, relations, treaties, treaty expiration/breaking, betrayal memory, and cooperation.
-- Versioned WORLDSTATE macro persistence and scheduled-event queue persistence.
+- Versioned WORLDSTATE macro persistence, scheduled-event queue persistence, and a
+  single-file macro checkpoint that stores world state and pending events in one
+  generation. Handlers are not stored; built-ins are recreated and other kinds must
+  be registered again. Full-session compaction is still a later milestone.
 
 ### Playable deterministic text world
 - LOOK, MOVE, INSPECT, MAP, STATUS, WAIT, ATTACK, ADVANCE, TAKE, DROP, INVENTORY, TALK,
   OPEN, CLOSE, SHOOT, HELP, and QUIT.
 - Real time advancement drives physiology, ambient NPC routines, and macro events.
 - Event-sourced deterministic replay saves with state digests and tamper detection.
-- Replay digest currently covers actor/combat state, inventory/world items, doors, ranged weapons,
-  sound events, heard memories, scenery, time, transcript, and command history.
+  Schema 2 digests add authoritative environment fields and SkillSet configuration
+  (learning rate, baseline level, and canonical transfer weights) to the existing
+  actor, combat, inventory, door, item, ranged, sound, memory, scenery, time,
+  transcript, and command coverage. Schema 1 saves still load under the schema-1
+  digest and are not reinterpreted as schema 2. Replay rebuilds the demo from its
+  seed and commands; custom initial state is rejected rather than silently dropped.
 
 ## Current implementation priorities
 

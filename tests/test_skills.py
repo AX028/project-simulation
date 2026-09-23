@@ -318,3 +318,114 @@ def test_combat_skill_progression_is_replay_deterministic() -> None:
     assert first.replay(commands) == second.replay(commands)
     assert first.player.skills == second.player.skills
     assert session_digest(first) == session_digest(second)
+
+
+def test_miss_quality_trains_less_than_hit_quality_once_per_event() -> None:
+    event = dict(difficulty=60.0, duration_hours=1.0 / 3600.0, context="combat:aggressive")
+    hit = SkillSet()
+    miss = SkillSet()
+    hit.practice("sword", PracticeEvent(**event, quality=0.82))
+    miss.practice("sword", PracticeEvent(**event, quality=0.58))
+
+    assert hit.skills["sword"].practice_counts["combat:aggressive"] == 1
+    assert miss.skills["sword"].practice_counts["combat:aggressive"] == 1
+    assert hit.skills["sword"].experience_hours == pytest.approx(
+        miss.skills["sword"].experience_hours
+    )
+    assert hit.skills["sword"].knowledge > miss.skills["sword"].knowledge
+
+
+def test_textworld_attack_awards_practice_once_and_invalid_actions_award_none() -> None:
+    missed_reach = build_demo_session(81)
+    missed_reach.execute("attack Wolf torso")
+    assert "sword" not in missed_reach.player.skills.skills
+
+    invalid = build_demo_session(81)
+    with pytest.raises(ValueError):
+        invalid.execute("attack Goblin torso")
+    assert invalid.player.skills.skills == {}
+
+    session = build_demo_session(81)
+    session.execute("advance Wolf 5")
+    session.execute("attack Wolf torso")
+    sword = session.player.skills.skills["sword"]
+    assert sum(sword.practice_counts.values()) == 1
+    session.execute("attack Wolf torso")
+    assert sum(sword.practice_counts.values()) == 2
+
+
+def test_transfer_order_is_irrelevant_and_weights_stay_in_range() -> None:
+    event = PracticeEvent(
+        difficulty=60.0,
+        duration_hours=1.0,
+        quality=0.8,
+        context="drill",
+    )
+    forward = SkillSet(transfers={"sword": {"knife": 0.1, "spear": 0.2}})
+    reverse = SkillSet(transfers={"sword": {"spear": 0.2, "knife": 0.1}})
+    forward.practice("sword", event)
+    reverse.practice("sword", event)
+
+    assert forward.skills["knife"].knowledge == pytest.approx(
+        reverse.skills["knife"].knowledge
+    )
+    assert forward.skills["spear"].technique == pytest.approx(
+        reverse.skills["spear"].technique
+    )
+    with pytest.raises(ValueError, match="transfer weight"):
+        SkillSet(transfers={"sword": {"knife": 1.1}})
+
+
+def test_lod_round_trip_does_not_alias_skill_configuration() -> None:
+    actor = WorldActor(
+        SpatialEntity("actor", "Actor", Vec3(0.0, 0.0, 0.0)),
+        Mind(),
+        Physiology(70.0),
+        Loadout(70.0),
+    )
+    actor.skills.learning_rate = 1.7
+    actor.skills.baseline_level = 40.0
+    actor.skills.transfers["sword"]["knife"] = 0.33
+    actor.skills.practice(
+        "tracking",
+        PracticeEvent(
+            difficulty=65.0,
+            duration_hours=2.0,
+            quality=0.9,
+            context="forest",
+        ),
+    )
+
+    snapshot = abstract_actor(actor, tier=SimulationLOD.REGION, now=10.0)
+    restored = restore_actor(snapshot)
+    restored.skills.skills["tracking"].practice_counts["forest"] = 99
+    restored.skills.transfers["sword"]["knife"] = 0.01
+    restored.skills.learning_rate = 0.4
+
+    assert actor.skills.learning_rate == pytest.approx(1.7)
+    assert actor.skills.baseline_level == pytest.approx(40.0)
+    assert actor.skills.transfers["sword"]["knife"] == pytest.approx(0.33)
+    assert actor.skills.skills["tracking"].practice_counts["forest"] == 1
+    assert snapshot.skills.transfers["sword"]["knife"] == pytest.approx(0.33)
+    assert restored.skills.baseline_level == pytest.approx(40.0)
+    assert restored.skills is not actor.skills
+    assert restored.skills.transfers is not actor.skills.transfers
+
+
+def test_archery_practice_does_not_change_the_shot() -> None:
+    novice = build_demo_session(72)
+    expert = build_demo_session(72)
+    expert.player.skills.skills["archery"] = SkillState(
+        "archery",
+        knowledge=100.0,
+        technique=100.0,
+        automaticity=100.0,
+        experience_hours=40.0,
+    )
+
+    novice_text = novice.execute("shoot Wolf torso").output
+    expert_text = expert.execute("shoot Wolf torso").output
+
+    assert novice_text == expert_text
+    assert "archery" in novice.player.skills.skills
+    assert "archery" in expert.player.skills.skills

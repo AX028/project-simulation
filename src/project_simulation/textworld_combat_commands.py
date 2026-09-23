@@ -31,6 +31,7 @@ def advance(
         args[1] if len(args) == 2 else "1",
         "seconds",
     )
+    session._align_environment_clock()
     target = session.actors[target_id]
     direction = target.spatial.position - session.player.spatial.position
     if direction.magnitude > 0:

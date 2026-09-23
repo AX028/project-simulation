@@ -21,6 +21,7 @@ def look(session: TextWorldSession, args: tuple[str, ...]) -> tuple[str, bool]:
             session.entities,
             illumination=session.environment.illumination,
             contrast=session.environment.contrast_multiplier,
+            vision=session.player.vision,
         ),
         False,
     )

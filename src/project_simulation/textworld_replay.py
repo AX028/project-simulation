@@ -1,4 +1,18 @@
-"""Event-sourced save/load for deterministic text-world sessions."""
+"""Event-sourced save/load for deterministic text-world sessions.
+
+Supported reconstruction is ``build_demo_session(seed)`` followed by the saved
+command list. Schema 2 digests authenticate that replay. They include the
+authoritative environment fields and each actor's SkillSet configuration
+(learning rate, baseline level, and transfer weights). Derived environment
+properties are omitted. Transfer maps are sorted, so insertion order is not
+part of identity.
+
+Schema 1 saves still load, but they are checked with the schema-1 digest.
+That digest does not cover environment or skill configuration, and a schema-1
+file is never accepted under schema-2 rules. Custom initial state and
+out-of-band mutation cannot be represented: ``write`` rejects them instead of
+emitting a file that would fail on load. This is not a full-session checkpoint.
+"""
 
 from __future__ import annotations
 
@@ -7,56 +21,127 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .environment import EnvironmentState
 from .models import IncompatibleSaveError
+from .skills import SkillSet
 from .textworld import TextWorldSession, build_demo_session
 
-TEXTWORLD_REPLAY_SCHEMA_VERSION = 1
+TEXTWORLD_REPLAY_SCHEMA_VERSION = 2
+_TEXTWORLD_REPLAY_SCHEMA_V1 = 1
+
+_CUSTOM_STATE_MESSAGE = (
+    "text-world replay cannot save custom initial state or out-of-band "
+    "mutation; only a demo session rebuilt from its seed and commands "
+    "is supported"
+)
 
 
 def session_digest(session: TextWorldSession) -> str:
+    """Return the schema-2 identity of ``session``."""
+    return _digest(session, schema_version=TEXTWORLD_REPLAY_SCHEMA_VERSION)
+
+
+def session_digest_v1(session: TextWorldSession) -> str:
+    """Return the schema-1 identity of ``session``.
+
+    Schema 1 does not authenticate environment fields or SkillSet
+    configuration. Those mutations leave this digest unchanged.
+    """
+    return _digest(session, schema_version=_TEXTWORLD_REPLAY_SCHEMA_V1)
+
+
+def _digest(session: TextWorldSession, *, schema_version: int) -> str:
+    encoded = json.dumps(
+        _identity_payload(session, schema_version=schema_version),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _skill_configuration(skills: SkillSet) -> dict[str, Any]:
+    return {
+        "learning_rate": round(skills.learning_rate, 12),
+        "baseline_level": round(skills.baseline_level, 9),
+        "transfers": {
+            source: {
+                target: round(weight, 9)
+                for target, weight in sorted(targets.items())
+            }
+            for source, targets in sorted(skills.transfers.items())
+        },
+    }
+
+
+def _environment_identity(environment: EnvironmentState) -> dict[str, Any]:
+    wind = environment.wind_velocity
+    return {
+        "world_hour": round(environment.world_hour, 12),
+        "weather": environment.weather.value,
+        "base_temperature_c": round(environment.base_temperature_c, 9),
+        "wind_velocity": [
+            round(wind.x, 9),
+            round(wind.y, 9),
+            round(wind.z, 9),
+        ],
+        "precipitation": round(environment.precipitation, 9),
+        "cloud_cover": round(environment.cloud_cover, 9),
+        "fog_density": round(environment.fog_density, 9),
+        "ground_wetness": round(environment.ground_wetness, 9),
+    }
+
+
+def _identity_payload(
+    session: TextWorldSession,
+    *,
+    schema_version: int,
+) -> dict[str, Any]:
+    actors: dict[str, Any] = {}
+    for actor_id, actor in sorted(session.actors.items()):
+        record: dict[str, Any] = {
+            "position": [
+                round(actor.spatial.position.x, 9),
+                round(actor.spatial.position.y, 9),
+                round(actor.spatial.position.z, 9),
+            ],
+            "velocity": [
+                round(actor.spatial.velocity.x, 9),
+                round(actor.spatial.velocity.y, 9),
+                round(actor.spatial.velocity.z, 9),
+            ],
+            "fatigue": round(actor.physiology.fatigue, 9),
+            "blood_lost_ml": round(actor.physiology.blood_lost_ml, 9),
+            "hydration_l": round(actor.physiology.hydration_l, 9),
+            "core_temperature_c": round(actor.physiology.core_temperature_c, 9),
+            "skills": {
+                skill_id: {
+                    "knowledge": round(skill.knowledge, 9),
+                    "technique": round(skill.technique, 9),
+                    "automaticity": round(skill.automaticity, 9),
+                    "experience_hours": round(skill.experience_hours, 12),
+                    "practice_counts": dict(sorted(skill.practice_counts.items())),
+                }
+                for skill_id, skill in sorted(actor.skills.skills.items())
+            },
+            "injuries": [
+                {
+                    "location": injury.location,
+                    "type": injury.injury_type.value,
+                    "severity": round(injury.severity, 9),
+                    "bleeding": round(injury.bleeding_ml_per_min, 9),
+                    "pain": round(injury.pain, 9),
+                }
+                for injury in actor.physiology.injuries
+            ],
+        }
+        if schema_version >= TEXTWORLD_REPLAY_SCHEMA_VERSION:
+            record["skill_configuration"] = _skill_configuration(actor.skills)
+        actors[actor_id] = record
+
     payload: dict[str, Any] = {
         "elapsed_seconds": round(session.elapsed_seconds, 9),
-        "actors": {
-            actor_id: {
-                "position": [
-                    round(actor.spatial.position.x, 9),
-                    round(actor.spatial.position.y, 9),
-                    round(actor.spatial.position.z, 9),
-                ],
-                "velocity": [
-                    round(actor.spatial.velocity.x, 9),
-                    round(actor.spatial.velocity.y, 9),
-                    round(actor.spatial.velocity.z, 9),
-                ],
-                "fatigue": round(actor.physiology.fatigue, 9),
-                "blood_lost_ml": round(actor.physiology.blood_lost_ml, 9),
-                "hydration_l": round(actor.physiology.hydration_l, 9),
-                "core_temperature_c": round(actor.physiology.core_temperature_c, 9),
-                "skills": {
-                    skill_id: {
-                        "knowledge": round(skill.knowledge, 9),
-                        "technique": round(skill.technique, 9),
-                        "automaticity": round(skill.automaticity, 9),
-                        "experience_hours": round(skill.experience_hours, 12),
-                        "practice_counts": dict(
-                            sorted(skill.practice_counts.items())
-                        ),
-                    }
-                    for skill_id, skill in sorted(actor.skills.skills.items())
-                },
-                "injuries": [
-                    {
-                        "location": injury.location,
-                        "type": injury.injury_type.value,
-                        "severity": round(injury.severity, 9),
-                        "bleeding": round(injury.bleeding_ml_per_min, 9),
-                        "pain": round(injury.pain, 9),
-                    }
-                    for injury in actor.physiology.injuries
-                ],
-            }
-            for actor_id, actor in sorted(session.actors.items())
-        },
+        "actors": actors,
         "combat": {
             actor_id: {
                 str(part): body.current_hp
@@ -154,13 +239,9 @@ def session_digest(session: TextWorldSession) -> str:
         "transcript": list(session.transcript),
         "commands": list(session.command_history),
     }
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    if schema_version >= TEXTWORLD_REPLAY_SCHEMA_VERSION:
+        payload["environment"] = _environment_identity(session.environment)
+    return payload
 
 
 class TextWorldReplayStore:
@@ -168,6 +249,16 @@ class TextWorldReplayStore:
     def write(session: TextWorldSession, path: str | Path) -> None:
         if session.seed is None:
             raise ValueError("session seed is required for deterministic replay saves")
+
+        try:
+            rebuilt = build_demo_session(session.seed)
+            rebuilt.replay(tuple(session.command_history))
+        except (TypeError, ValueError) as exc:
+            raise IncompatibleSaveError(
+                f"text-world replay cannot save this command history: {exc}"
+            ) from exc
+        if session_digest(rebuilt) != session_digest(session):
+            raise IncompatibleSaveError(_CUSTOM_STATE_MESSAGE)
 
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +287,11 @@ class TextWorldReplayStore:
         if not isinstance(raw, dict):
             raise IncompatibleSaveError("text-world replay root must be an object")
         version = raw.get("schema_version")
-        if version != TEXTWORLD_REPLAY_SCHEMA_VERSION:
+        if version == TEXTWORLD_REPLAY_SCHEMA_VERSION:
+            digest_of = session_digest
+        elif version == _TEXTWORLD_REPLAY_SCHEMA_V1:
+            digest_of = session_digest_v1
+        else:
             raise IncompatibleSaveError(
                 f"unsupported text-world replay schema: {version}"
             )
@@ -212,7 +307,7 @@ class TextWorldReplayStore:
 
             session = build_demo_session(seed)
             session.replay(tuple(commands_raw))
-            actual_digest = session_digest(session)
+            actual_digest = digest_of(session)
             if actual_digest != expected_digest:
                 raise IncompatibleSaveError(
                     "replayed session does not match stored state digest"
