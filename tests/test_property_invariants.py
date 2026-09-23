@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from numpy import array_equal
 
 from project_simulation import (
     Loadout,
@@ -124,10 +124,10 @@ def test_generated_world_round_trip_preserves_every_layer(
 
     assert restored.seed == world.seed
     assert restored.config == world.config
-    assert np.array_equal(restored.terrain, world.terrain)
-    assert np.array_equal(restored.biome, world.biome)
-    assert np.array_equal(restored.temperature, world.temperature)
-    assert np.array_equal(restored.precipitation, world.precipitation)
+    assert array_equal(restored.terrain, world.terrain)
+    assert array_equal(restored.biome, world.biome)
+    assert array_equal(restored.temperature, world.temperature)
+    assert array_equal(restored.precipitation, world.precipitation)
 
 
 @st.composite
