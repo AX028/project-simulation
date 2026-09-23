@@ -213,7 +213,7 @@ def shoot(
             difficulty=min(100.0, 25.0 + shot_distance * 4.0),
             duration_hours=max(1.0, flight_time) / 3600.0,
             quality=practice_quality,
-            context=f"ranged:{target.actor.archetype}",
+            context=f"ranged:{session.combatants[target_id].actor.archetype}",
         ),
     )
 
