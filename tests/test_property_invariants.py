@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from project_simulation import (
     Loadout,
     Mind,
     Physiology,
-    ResourcePool,
     SimulationKernel,
     SpatialEntity,
     Vec3,
@@ -20,6 +20,7 @@ from project_simulation import (
     generate_world,
     move_actor_with_collisions,
 )
+from project_simulation.models import ResourcePool
 from project_simulation.spatial import Bounds
 
 
