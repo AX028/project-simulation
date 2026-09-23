@@ -94,6 +94,11 @@ def session_digest(session: TextWorldSession) -> str:
                 "name": container.name,
                 "open": container.is_open,
                 "locked": container.locked,
+                "integrity": round(container.integrity, 9),
+                "hardness": round(container.hardness, 9),
+                "destroyed": container.destroyed,
+                "spilled": container.spilled,
+                "tags": sorted(container.spatial.tags),
                 "position": [
                     round(container.spatial.position.x, 9),
                     round(container.spatial.position.y, 9),
@@ -134,11 +139,14 @@ def session_digest(session: TextWorldSession) -> str:
             for item_id, item in sorted(session.world_items.items())
         },
         "scenery": {
-            entity.entity_id: [
-                round(entity.position.x, 9),
-                round(entity.position.y, 9),
-                round(entity.position.z, 9),
-            ]
+            entity.entity_id: {
+                "position": [
+                    round(entity.position.x, 9),
+                    round(entity.position.y, 9),
+                    round(entity.position.z, 9),
+                ],
+                "tags": sorted(entity.tags),
+            }
             for entity in sorted(session.scenery, key=lambda value: value.entity_id)
         },
         "ranged_weapons": {

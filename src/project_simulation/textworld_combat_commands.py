@@ -184,6 +184,11 @@ def shoot(
     ]
     projectile_targets.extend(session.scenery)
     projectile_targets.extend(
+        container.spatial
+        for container in session.scene_containers.values()
+        if not container.destroyed
+    )
+    projectile_targets.extend(
         door.spatial
         for door in session.doors.values()
         if not door.is_open and not door.destroyed
@@ -252,6 +257,26 @@ def shoot(
         )
         return (
             f"{prefix}{impact.text} Ammunition remaining: "
+            f"{weapon.ammunition}.",
+            False,
+        )
+
+    if hit.target_id in session.scene_containers:
+        container = session.scene_containers[hit.target_id]
+        structural_damage = max(0.0, hit.kinetic_energy_j ** 0.5)
+        dealt, spilled = session.apply_scene_container_damage(
+            container.container_id,
+            structural_damage,
+        )
+        destruction = ""
+        if container.destroyed:
+            destruction = " It breaks open."
+            if spilled:
+                item_names = ", ".join(item.name for item in spilled)
+                destruction = f"{destruction} Spilled contents: {item_names}."
+        return (
+            f"The projectile strikes {container.name} for {dealt:.1f} "
+            f"structural damage.{destruction} Ammunition remaining: "
             f"{weapon.ammunition}.",
             False,
         )

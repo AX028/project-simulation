@@ -16,7 +16,7 @@ from .environment import EnvironmentState
 from .physiology import PhysicalItem
 from .ranged import RangedWeapon
 from .simulation import SimulationKernel
-from .spatial import SpatialEntity, Vec3
+from .spatial import Bounds, SpatialEntity, Vec3
 from .spatial_combat import SpatialCombatant
 from .textworld_commands import (
     CommandKind,
@@ -99,6 +99,64 @@ class TextWorldSession:
 
     def replay(self, commands: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(self.execute(command).output for command in commands)
+
+    def apply_scene_container_damage(
+        self,
+        container_id: str,
+        damage: float,
+    ) -> tuple[float, tuple[PhysicalItem, ...]]:
+        try:
+            container = self.scene_containers[container_id]
+        except KeyError as exc:
+            raise ValueError(
+                f"unknown scene container: {container_id}"
+            ) from exc
+
+        dealt = container.apply_damage(damage)
+        if not container.destroyed or container.spilled:
+            return dealt, ()
+
+        occupied_ids = {
+            entity.entity_id
+            for entity in self.entities
+        } | set(self.world_items)
+        duplicate_ids = sorted(
+            item.item_id
+            for item in container.items
+            if item.item_id in occupied_ids
+        )
+        if duplicate_ids:
+            duplicates = ", ".join(duplicate_ids)
+            raise ValueError(
+                f"cannot spill duplicate world item ids: {duplicates}"
+            )
+
+        spilled = container.spill_contents()
+        cursor_x = container.spatial.bounds.half_width + 0.1
+        entities: list[SpatialEntity] = []
+        for item in spilled:
+            volume_m3 = max(0.000125, item.volume_l / 1000.0)
+            side = volume_m3 ** (1.0 / 3.0)
+            cursor_x += side / 2.0
+            position = container.spatial.position + Vec3(
+                cursor_x,
+                0.0,
+                0.0,
+            )
+            entities.append(
+                SpatialEntity(
+                    item.item_id,
+                    item.name,
+                    position,
+                    bounds=Bounds(side / 2.0, side / 2.0, side),
+                    mass_kg=item.mass_kg,
+                    tags=frozenset({"item", "spilled"}),
+                )
+            )
+            self.world_items[item.item_id] = item
+            cursor_x += side / 2.0 + 0.1
+        self.scenery = (*self.scenery, *entities)
+        return dealt, spilled
 
     def _look(self, args: tuple[str, ...]) -> tuple[str, bool]:
         from .textworld_interactions import look
