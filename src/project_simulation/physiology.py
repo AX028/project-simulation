@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from math import exp
 
-from .validation import bounded_number, nonnegative_number, positive_number
+from .validation import bounded_number, finite_number, nonnegative_number, positive_number
+
+MINIMUM_AMBIENT_TEMPERATURE_C = -150.0
+MAXIMUM_AMBIENT_TEMPERATURE_C = 150.0
 
 
 class InjuryType(StrEnum):
@@ -95,8 +98,12 @@ class Physiology:
     def tick(self, minutes: float, *, exertion: float = 0.0, ambient_c: float = 20.0) -> None:
         minutes = nonnegative_number(minutes, "elapsed minutes")
         exertion = nonnegative_number(exertion, "exertion")
-        ambient_c = float(ambient_c)
-        if not -150.0 <= ambient_c <= 150.0:
+        ambient_c = finite_number(ambient_c, "ambient temperature")
+        if not (
+            MINIMUM_AMBIENT_TEMPERATURE_C
+            <= ambient_c
+            <= MAXIMUM_AMBIENT_TEMPERATURE_C
+        ):
             raise ValueError("ambient temperature is outside supported range")
         self.blood_lost_ml += sum(i.bleeding_ml_per_min for i in self.injuries) * minutes
         self.caloric_reserve_kcal -= minutes / 60.0 * (70.0 + 260.0 * max(0.0, exertion))

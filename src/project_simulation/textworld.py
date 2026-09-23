@@ -13,7 +13,11 @@ from .acoustics import HeardSound, HearingProfile, SoundEvent
 from .ambient import AmbientNPCSimulation
 from .doors import Door
 from .environment import EnvironmentState
-from .physiology import PhysicalItem
+from .physiology import (
+    MAXIMUM_AMBIENT_TEMPERATURE_C,
+    MINIMUM_AMBIENT_TEMPERATURE_C,
+    PhysicalItem,
+)
 from .ranged import RangedWeapon
 from .simulation import SimulationKernel
 from .spatial import SpatialEntity, Vec3
@@ -24,7 +28,7 @@ from .textworld_commands import (
     ParsedCommand,
     parse_command,
 )
-from .validation import positive_number
+from .validation import finite_number, positive_number
 from .worldstate import WorldActor
 
 
@@ -217,6 +221,18 @@ class TextWorldSession:
         *,
         already_advanced: set[str] | None = None,
     ) -> None:
+        """Advance physiology, ambient actors, environment, and session time.
+
+        The kernel clock is authoritative when a kernel is attached.
+        Otherwise the authoritative clock is elapsed session time. This
+        method sets environment time to that clock before advancing, so a
+        divergent environment hour is replaced rather than integrated.
+        Seconds and ambient temperature are checked before any actor changes.
+        """
+        seconds = finite_number(seconds, "elapsed seconds")
+        if seconds < 0:
+            raise ValueError("session time may not move backward")
+
         skipped = already_advanced or set()
         ambient_ids = (
             self.ambient.actor_ids
@@ -228,9 +244,18 @@ class TextWorldSession:
             if self.kernel is not None
             else self.elapsed_seconds / 3600.0
         )
-
+        previous_hour = self.environment.world_hour
         self.environment.world_hour = start_world_hour
         ambient_c = self.environment.ambient_temperature_c
+        if not (
+            MINIMUM_AMBIENT_TEMPERATURE_C
+            <= ambient_c
+            <= MAXIMUM_AMBIENT_TEMPERATURE_C
+        ):
+            self.environment.world_hour = previous_hour
+            raise ValueError(
+                "ambient temperature is outside supported range"
+            )
         speed_multiplier = self.environment.movement_speed_multiplier
 
         for actor_id, actor in self.actors.items():
