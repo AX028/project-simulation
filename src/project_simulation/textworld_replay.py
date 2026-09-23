@@ -1,4 +1,16 @@
-"""Event-sourced save/load for deterministic text-world sessions."""
+"""Event-sourced save/load for deterministic text-world sessions.
+
+Loading rebuilds ``build_demo_session(seed)`` and replays the stored commands.
+It does not restore an arbitrary session. Schema 2 digests include
+authoritative environment fields and each actor's skill configuration
+(learning rate, baseline level, and transfer map). Derived environment
+quantities are omitted. Out-of-band edits to those fields change the digest,
+so a later load fails instead of dropping the edits.
+
+Schema 1 digests omit environment and skill configuration. Those saves still
+load, and their digests are checked with the schema 1 payload. A schema 1
+digest is never accepted as a schema 2 identity.
+"""
 
 from __future__ import annotations
 
@@ -8,12 +20,40 @@ from pathlib import Path
 from typing import Any
 
 from .models import IncompatibleSaveError
+from .skills import SkillSet
 from .textworld import TextWorldSession, build_demo_session
 
-TEXTWORLD_REPLAY_SCHEMA_VERSION = 1
+TEXTWORLD_REPLAY_SCHEMA_VERSION = 2
+_SUPPORTED_REPLAY_SCHEMAS = (1, TEXTWORLD_REPLAY_SCHEMA_VERSION)
 
 
-def session_digest(session: TextWorldSession) -> str:
+def _skill_configuration(skills: SkillSet) -> dict[str, Any]:
+    return {
+        "learning_rate": round(skills.learning_rate, 9),
+        "baseline_level": round(skills.baseline_level, 9),
+        "transfers": {
+            source: {
+                target: round(weight, 9)
+                for target, weight in sorted(mapping.items())
+            }
+            for source, mapping in sorted(skills.transfers.items())
+        },
+    }
+
+
+def session_digest(
+    session: TextWorldSession,
+    *,
+    schema_version: int | None = None,
+) -> str:
+    version = (
+        TEXTWORLD_REPLAY_SCHEMA_VERSION
+        if schema_version is None
+        else schema_version
+    )
+    if version not in _SUPPORTED_REPLAY_SCHEMAS:
+        raise ValueError(f"unsupported text-world replay schema: {version}")
+
     payload: dict[str, Any] = {
         "elapsed_seconds": round(session.elapsed_seconds, 9),
         "actors": {
@@ -154,6 +194,26 @@ def session_digest(session: TextWorldSession) -> str:
         "transcript": list(session.transcript),
         "commands": list(session.command_history),
     }
+    if version >= 2:
+        environment = session.environment
+        payload["environment"] = {
+            "world_hour": round(environment.world_hour, 12),
+            "weather": environment.weather.value,
+            "base_temperature_c": round(environment.base_temperature_c, 9),
+            "wind_velocity": [
+                round(environment.wind_velocity.x, 9),
+                round(environment.wind_velocity.y, 9),
+                round(environment.wind_velocity.z, 9),
+            ],
+            "precipitation": round(environment.precipitation, 9),
+            "cloud_cover": round(environment.cloud_cover, 9),
+            "fog_density": round(environment.fog_density, 9),
+            "ground_wetness": round(environment.ground_wetness, 9),
+        }
+        for actor_id, actor in session.actors.items():
+            payload["actors"][actor_id]["skill_configuration"] = (
+                _skill_configuration(actor.skills)
+            )
     encoded = json.dumps(
         payload,
         sort_keys=True,
@@ -196,7 +256,7 @@ class TextWorldReplayStore:
         if not isinstance(raw, dict):
             raise IncompatibleSaveError("text-world replay root must be an object")
         version = raw.get("schema_version")
-        if version != TEXTWORLD_REPLAY_SCHEMA_VERSION:
+        if version not in _SUPPORTED_REPLAY_SCHEMAS:
             raise IncompatibleSaveError(
                 f"unsupported text-world replay schema: {version}"
             )
@@ -212,7 +272,7 @@ class TextWorldReplayStore:
 
             session = build_demo_session(seed)
             session.replay(tuple(commands_raw))
-            actual_digest = session_digest(session)
+            actual_digest = session_digest(session, schema_version=int(version))
             if actual_digest != expected_digest:
                 raise IncompatibleSaveError(
                     "replayed session does not match stored state digest"

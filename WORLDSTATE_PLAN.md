@@ -56,21 +56,42 @@ The validation runner is `scripts/validate.py`.
 - Employment response, attractiveness, and population-conserving migration.
 - Factions, relations, treaties, treaty expiration/breaking, betrayal memory, and cooperation.
 - Versioned WORLDSTATE macro persistence and scheduled-event queue persistence.
+- Atomic macro checkpoint bundling that world state with the pending event queue
+  and the next event sequence. Custom handlers are not stored; register them
+  again before resuming. Actor, cognition, and RNG state stay outside this save.
 
 ### Playable deterministic text world
 - LOOK, MOVE, INSPECT, MAP, STATUS, WAIT, ATTACK, ADVANCE, TAKE, DROP, INVENTORY, TALK,
   OPEN, CLOSE, SHOOT, HELP, and QUIT.
 - Real time advancement drives physiology, ambient NPC routines, and macro events.
 - Event-sourced deterministic replay saves with state digests and tamper detection.
-- Replay digest currently covers actor/combat state, inventory/world items, doors, ranged weapons,
-  sound events, heard memories, scenery, time, transcript, and command history.
+- Replay digest schema 2 adds authoritative environment fields and per-actor skill
+  configuration (learning rate, baseline level, transfer map). Schema 1 saves still
+  load under the old digest. Loading always rebuilds the demo from its seed and
+  command list; out-of-band environment or skill-configuration edits fail the digest
+  check instead of being dropped.
+
+## Skill call sites
+
+| Call site | Performance | Practice | Notes |
+| --- | --- | --- | --- |
+| Text-world `ATTACK` | Spatial combat skill modifier | One gain when the strike is in reach | Out-of-reach and invalid attacks grant nothing |
+| Text-world `SHOOT` | Not applied to aim or the projectile | One gain per shot | Archery level does not change the shot |
+| `SpatialCombatResolver` | Attacker skill modifier | None; the caller may award it | Physiology and encumbrance also apply |
+| `SpatialEncounterEngine` | Through the spatial resolver | None | Encounter turns do not train skills |
+| Legacy `CombatEngine` | None | None | Intentionally stat-based |
+| Ranged impact resolution | None | None | Damage resolution only |
+| NPC decisions and plans | None | None | No skill inputs |
+| Instruction API | `SkillSet.practice` | Supported, including instruction quality | No text command yet |
+| LOD abstract/restore | Preserved | Preserved | Deep copy; no shared mutable skill state |
 
 ## Current implementation priorities
 
-1. Environmental state: time-of-day light, weather, wind, precipitation, and temperature as shared
-   inputs to vision, projectile drift, sound, movement, and physiology.
-2. Skills/progression: use/training/instruction gains with difficulty, novelty, transfer, and
-   performance derived from skill + physiology + context.
+1. Environmental state is a tested input to vision, projectile drift, sound, movement, and
+   physiology. Kernel time owns the shared clock. Wetness changes within a step use the daylight
+   at the start of that step, so a long step need not match subdivided steps.
+2. Skills/progression covers practice, transfer, and performance. Text-world attacks and shots
+   train skills; archery level does not yet change the shot, and there is no training command.
 3. More complete world-object interaction: containers in the scene, item accessibility, breaking
    objects, and construction/destruction.
 4. Automatic macro coupling: settlement production, migration, faction activity, and information

@@ -7,6 +7,7 @@ from enum import StrEnum
 from math import cos, pi, sin
 
 from .spatial import Vec3
+from .validation import finite_number
 
 
 class WeatherKind(StrEnum):
@@ -30,6 +31,8 @@ class EnvironmentState:
     ground_wetness: float = 0.0
 
     def __post_init__(self) -> None:
+        finite_number(self.world_hour, "world hour")
+        finite_number(self.base_temperature_c, "base temperature")
         for name in ("precipitation", "cloud_cover", "fog_density", "ground_wetness"):
             value = float(getattr(self, name))
             if not 0.0 <= value <= 1.0:
@@ -133,6 +136,14 @@ class EnvironmentState:
         )
 
     def advance(self, hours: float) -> None:
+        """Advance weather-driven ground wetness, then the environment clock.
+
+        Drying and precipitation use daylight and wind at the start of this
+        step. One long step therefore differs from several shorter steps when
+        daylight changes during the interval. Callers that need agreement
+        must subdivide the step themselves.
+        """
+        hours = finite_number(hours, "environment time step")
         if hours < 0:
             raise ValueError("environment time may not move backward")
         if hours == 0:

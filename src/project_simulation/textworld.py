@@ -217,6 +217,16 @@ class TextWorldSession:
         *,
         already_advanced: set[str] | None = None,
     ) -> None:
+        """Advance physiology, ambient actors, the environment, and the kernel.
+
+        With a kernel attached, kernel world time is the clock. Environment
+        ``world_hour`` is aligned to it at the start of the step, including
+        the first action, then both advance by the same duration. Elapsed
+        session time stays on that same scale. Without a kernel, elapsed
+        session time is the clock. Ground wetness uses conditions at the
+        step start, so a long step is not required to match subdivided steps
+        once daylight changes.
+        """
         skipped = already_advanced or set()
         ambient_ids = (
             self.ambient.actor_ids
