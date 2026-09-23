@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .acoustics import HeardSound, HearingProfile, SoundEvent
 from .ambient import AmbientNPCSimulation
@@ -27,6 +28,9 @@ from .textworld_commands import (
 from .validation import positive_number
 from .world_objects import SceneContainer
 from .worldstate import WorldActor
+
+if TYPE_CHECKING:
+    from .settlement_dynamics import SettlementDynamics
 
 
 @dataclass(slots=True)
@@ -49,6 +53,7 @@ class TextWorldSession:
     seed: int | None = None
     command_history: list[str] = field(default_factory=list)
     scene_containers: dict[str, SceneContainer] = field(default_factory=dict)
+    settlement_dynamics: SettlementDynamics | None = None
 
     @property
     def player(self) -> WorldActor:
@@ -263,9 +268,7 @@ class TextWorldSession:
         self.elapsed_seconds += seconds
         self.environment.advance(seconds / 3600.0)
         if self.kernel is not None:
-            target_hour = (
-                self.kernel.world.time_hours + seconds / 3600.0
-            )
+            target_hour = self.elapsed_seconds / 3600.0
             self.kernel.advance_to(target_hour)
 
     def _resolve_actor(self, query: str) -> str:

@@ -92,13 +92,22 @@ def status(
 ) -> tuple[str, bool]:
     session._expect_count(args, 0, "status")
     body = session.player.physiology
+    settlement_text = ""
+    if session.kernel is not None and session.kernel.world.settlements:
+        summaries = (
+            f"{settlement.name} pop {settlement.population}, "
+            f"food {settlement.food_units:.1f}, "
+            f"price {settlement.prices.get('food', 1.0):.2f}"
+            for _, settlement in sorted(session.kernel.world.settlements.items())
+        )
+        settlement_text = f"; settlements {' | '.join(summaries)}"
     return (
         f"Position {session._position_text(session.player.spatial.position)}; "
         f"speed {session.player.effective_speed():.2f} m/s; "
         f"fatigue {body.fatigue:.2f}; blood lost "
         f"{body.blood_lost_ml:.1f} ml; "
         f"injuries {len(body.injuries)}; environment "
-        f"{session.environment.describe()}.",
+        f"{session.environment.describe()}{settlement_text}.",
         False,
     )
 

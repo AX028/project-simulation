@@ -158,9 +158,15 @@ class SettlementDynamics:
         *,
         first_hour: float = 24.0,
         interval_hours: float = 24.0,
+        max_migrants_per_day: int = 10,
+        minimum_migration_pressure: float = 0.05,
     ) -> None:
         if interval_hours <= 0:
             raise ValueError("interval_hours must be positive")
+        if max_migrants_per_day < 0:
+            raise ValueError("max_migrants_per_day may not be negative")
+        if not 0.0 <= minimum_migration_pressure <= 1.0:
+            raise ValueError("minimum_migration_pressure must be between zero and one")
 
         event_kind = "daily_settlement"
         if kernel.has_handler(event_kind):
@@ -172,6 +178,11 @@ class SettlementDynamics:
             del world
             settlement_id = str(event.payload["settlement_id"])
             self.process_day(settlement_id)
+            self.migrate_best_destination(
+                settlement_id,
+                max_people=max_migrants_per_day,
+                minimum_pressure=minimum_migration_pressure,
+            )
             kernel.schedule(
                 event.at + interval_hours,
                 event_kind,

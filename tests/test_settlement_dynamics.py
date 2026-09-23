@@ -140,6 +140,30 @@ def test_kernel_binding_runs_and_reschedules_daily_updates() -> None:
     assert profile.market.quantity("food") == 0.0
 
 
+def test_daily_events_run_once_at_boundaries_and_reschedule() -> None:
+    village = _settlement("v", population=10, labor={"farmer": 5})
+    world = WorldState(settlements={"v": village})
+    profile = _profile("v", initial_food=0.0, farmer_output=3.0)
+    dynamics = SettlementDynamics(world, {"v": profile})
+    kernel = SimulationKernel(world)
+    dynamics.bind_to_kernel(kernel)
+
+    kernel.advance_to(23.999)
+    assert profile.market.quantity("food") == 0.0
+
+    kernel.advance_to(24.0)
+    assert profile.market.quantity("food") == 5.0
+
+    kernel.advance_to(24.001)
+    assert profile.market.quantity("food") == 5.0
+
+    kernel.advance_to(72.0)
+    assert profile.market.quantity("food") == 15.0
+    events = kernel.pending_events()
+    assert len(events) == 1
+    assert events[0].at == 96.0
+
+
 def test_migration_chooses_most_attractive_destination() -> None:
     source = _settlement(
         "source",

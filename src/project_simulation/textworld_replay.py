@@ -186,6 +186,42 @@ def session_digest(session: TextWorldSession) -> str:
             if session.kernel is None
             else round(session.kernel.world.time_hours, 12)
         ),
+        "settlements": (
+            {}
+            if session.kernel is None
+            else {
+                settlement_id: {
+                    "settlement_id": settlement.settlement_id,
+                    "name": settlement.name,
+                    "population": settlement.population,
+                    "food_units": round(settlement.food_units, 9),
+                    "wealth": round(settlement.wealth, 9),
+                    "security": round(settlement.security, 9),
+                    "livestock": round(settlement.livestock, 9),
+                    "labor": dict(sorted(settlement.labor.items())),
+                    "prices": {
+                        commodity_id: round(price, 9)
+                        for commodity_id, price in sorted(settlement.prices.items())
+                    },
+                }
+                for settlement_id, settlement in sorted(
+                    session.kernel.world.settlements.items()
+                )
+            }
+        ),
+        "pending_macro_events": (
+            []
+            if session.kernel is None
+            else [
+                {
+                    "at": round(event.at, 12),
+                    "sequence": event.sequence,
+                    "kind": event.kind,
+                    "payload": dict(sorted(event.payload.items())),
+                }
+                for event in session.kernel.pending_events()
+            ]
+        ),
         "transcript": list(session.transcript),
         "commands": list(session.command_history),
     }

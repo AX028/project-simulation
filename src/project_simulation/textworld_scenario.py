@@ -9,13 +9,19 @@ from .ambient import AmbientAgent, AmbientNPCSimulation
 from .cognition import Belief, Mind
 from .content import create_character, create_enemy
 from .doors import Door, PassageAxis
+from .economy import Commodity, Market, ProductionRecipe
 from .environment import EnvironmentState
 from .npc_controller import NPCController
 from .physiology import Container, Loadout, PhysicalItem, Physiology
 from .projectiles import ProjectileSpec
 from .ranged import RangedWeapon
 from .schedules import RoutineBlock, RoutineSchedule
-from .simulation import SimulationKernel, WorldState
+from .settlement_dynamics import (
+    OccupationRecipe,
+    SettlementDynamics,
+    SettlementEconomicProfile,
+)
+from .simulation import SettlementState, SimulationKernel, WorldState
 from .spatial import Bounds, SpatialEntity, Vec3
 from .spatial_combat import SpatialCombatant, WeaponPhysics
 from .world_objects import SceneContainer
@@ -23,6 +29,70 @@ from .worldstate import WorldActor
 
 if TYPE_CHECKING:
     from .textworld import TextWorldSession
+
+
+def _build_settlement_simulation() -> tuple[SimulationKernel, SettlementDynamics]:
+    food = Commodity("food", "Food", base_price=1.0, mass_kg=1.0)
+    settlements = {
+        "greenhollow": SettlementState(
+            "greenhollow",
+            "Greenhollow",
+            population=120,
+            food_units=70.0,
+            wealth=900.0,
+            security=5.5,
+            livestock=45.0,
+            labor={"farmer": 64},
+        ),
+        "stoneford": SettlementState(
+            "stoneford",
+            "Stoneford",
+            population=80,
+            food_units=180.0,
+            wealth=2800.0,
+            security=8.2,
+            livestock=75.0,
+            labor={"farmer": 48},
+        ),
+    }
+    profiles: dict[str, SettlementEconomicProfile] = {}
+    food_output = {"greenhollow": 1.8, "stoneford": 2.0}
+    worker_targets = {"greenhollow": 68, "stoneford": 50}
+    for settlement_id, settlement in settlements.items():
+        settlement.recompute_prices()
+        market = Market(
+            stock={"food": settlement.food_units},
+            demand={"food": float(settlement.population)},
+            prices={"food": settlement.prices["food"]},
+        )
+        profiles[settlement_id] = SettlementEconomicProfile(
+            settlement_id,
+            market,
+            commodities={"food": food},
+            occupation_recipes=(
+                OccupationRecipe(
+                    "farmer",
+                    ProductionRecipe(
+                        f"{settlement_id}-farming",
+                        inputs={},
+                        outputs={"food": food_output[settlement_id]},
+                        labor_hours=8.0,
+                    ),
+                ),
+            ),
+            occupation_targets={"farmer": worker_targets[settlement_id]},
+        )
+
+    world = WorldState(settlements=settlements)
+    kernel = SimulationKernel(world)
+    dynamics = SettlementDynamics(world, profiles)
+    dynamics.bind_to_kernel(
+        kernel,
+        first_hour=24.0,
+        interval_hours=24.0,
+        max_migrants_per_day=4,
+    )
+    return kernel, dynamics
 
 
 def build_demo_session(seed: int = 42) -> TextWorldSession:
@@ -194,7 +264,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         axis=PassageAxis.X,
     )
 
-    kernel = SimulationKernel(WorldState())
+    kernel, settlement_dynamics = _build_settlement_simulation()
     return TextWorldSession(
         player_id=player_actor.actor_id,
         actors={
@@ -222,6 +292,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         ranged_weapons={player_actor.actor_id: hunting_bow},
         environment=EnvironmentState(world_hour=0.0),
         kernel=kernel,
+        settlement_dynamics=settlement_dynamics,
         ambient=mira_ambient,
         seed=seed,
     )
