@@ -253,6 +253,10 @@ class SkillSet:
         skill_id: str,
         event: PracticeEvent,
     ) -> PracticeResult:
+        if not skill_id:
+            raise ValueError("skill_id may not be empty")
+        for weight in self.transfers.get(skill_id, {}).values():
+            bounded_number(weight, "transfer weight", 0.0, 1.0)
         state = self.ensure(skill_id)
         primary, novelty, difficulty = state.apply_practice(
             event,

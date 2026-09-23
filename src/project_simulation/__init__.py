@@ -63,6 +63,7 @@ from .information import (
     transmit_claim,
 )
 from .lod import AbstractActorState, ActorLODManager, abstract_actor, restore_actor
+from .macro_checkpoint import MacroCheckpointStore
 from .models import (
     Action,
     Actor,
@@ -241,6 +242,7 @@ __all__ = [
     "Injury",
     "InjuryType",
     "Loadout",
+    "MacroCheckpointStore",
     "Memory",
     "Mind",
     "sweep_entity",

@@ -1,4 +1,13 @@
-"""Shared environmental state for vision, movement, physiology, sound, and projectiles."""
+"""Shared environmental state for vision, movement, physiology, sound, and projectiles.
+
+``world_hour`` is the environmental clock. It advances by the same duration as
+kernel world time and session elapsed time, and an initial offset between those
+clocks is preserved. Hour-of-day effects use ``world_hour % 24``.
+
+Ground wetness is timestep-sensitive: drying uses the daylight factor at the
+start of each advance. A single long step is not required to match the same
+interval split into smaller steps. ``world_hour`` itself advances linearly.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +16,7 @@ from enum import StrEnum
 from math import cos, pi, sin
 
 from .spatial import Vec3
+from .validation import bounded_number, finite_number
 
 
 class WeatherKind(StrEnum):
@@ -30,10 +40,10 @@ class EnvironmentState:
     ground_wetness: float = 0.0
 
     def __post_init__(self) -> None:
+        finite_number(self.world_hour, "world hour")
+        finite_number(self.base_temperature_c, "base temperature")
         for name in ("precipitation", "cloud_cover", "fog_density", "ground_wetness"):
-            value = float(getattr(self, name))
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(f"{name} must be between zero and one")
+            bounded_number(float(getattr(self, name)), name, 0.0, 1.0)
 
     @property
     def hour_of_day(self) -> float:
@@ -133,6 +143,7 @@ class EnvironmentState:
         )
 
     def advance(self, hours: float) -> None:
+        hours = finite_number(hours, "environment duration")
         if hours < 0:
             raise ValueError("environment time may not move backward")
         if hours == 0:

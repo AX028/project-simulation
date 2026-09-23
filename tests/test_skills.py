@@ -318,3 +318,134 @@ def test_combat_skill_progression_is_replay_deterministic() -> None:
     assert first.replay(commands) == second.replay(commands)
     assert first.player.skills == second.player.skills
     assert session_digest(first) == session_digest(second)
+
+
+def test_unreachable_and_invalid_attacks_do_not_grant_practice() -> None:
+    session = build_demo_session(75)
+    session.execute("attack Wolf torso")
+    assert session.player.skills.skills == {}
+
+    with pytest.raises(ValueError, match="unknown actor"):
+        session.execute("attack Nobody")
+    with pytest.raises(ValueError, match="body_part"):
+        session.execute("attack Wolf not_a_limb")
+    assert session.player.skills.skills == {}
+
+
+def test_in_reach_attack_awards_practice_once_per_action() -> None:
+    session = build_demo_session(76)
+    session.execute("advance Wolf 5")
+    session.execute("attack Wolf torso")
+    sword = session.player.skills.skills["sword"]
+    assert sum(sword.practice_counts.values()) == 1
+
+    session.execute("attack Wolf torso")
+    assert sum(session.player.skills.skills["sword"].practice_counts.values()) == 2
+
+
+def test_invalid_shot_does_not_train_archery() -> None:
+    session = build_demo_session(77)
+    with pytest.raises(ValueError, match="unknown actor"):
+        session.execute("shoot Nobody")
+    assert "archery" not in session.player.skills.skills
+
+
+def test_archery_practice_does_not_change_the_geometric_shot() -> None:
+    low = build_demo_session(14)
+    high = build_demo_session(14)
+    low.player.skills.skills["archery"] = SkillState("archery", 0.0, 0.0, 0.0)
+    high.player.skills.skills["archery"] = SkillState(
+        "archery",
+        100.0,
+        100.0,
+        100.0,
+    )
+
+    assert low.execute("shoot Wolf torso").output == high.execute(
+        "shoot Wolf torso"
+    ).output
+    assert sum(low.player.skills.skills["archery"].practice_counts.values()) == 1
+    assert sum(high.player.skills.skills["archery"].practice_counts.values()) == 1
+
+
+def test_transfer_mapping_order_does_not_change_gains() -> None:
+    event = PracticeEvent(
+        difficulty=60.0,
+        duration_hours=1.0,
+        quality=0.8,
+        context="forms",
+    )
+    forward = SkillSet(transfers={"sword": {"knife": 0.2, "spear": 0.1}})
+    reverse_targets: dict[str, float] = {}
+    reverse_targets["spear"] = 0.1
+    reverse_targets["knife"] = 0.2
+    reverse = SkillSet(transfers={"sword": reverse_targets})
+
+    forward.practice("sword", event)
+    reverse.practice("sword", event)
+
+    assert forward.skills["knife"] == reverse.skills["knife"]
+    assert forward.skills["spear"] == reverse.skills["spear"]
+
+
+def test_invalid_transfer_weight_does_not_grant_practice() -> None:
+    skills = SkillSet()
+    skills.transfers["sword"] = {"knife": 1.5}
+    with pytest.raises(ValueError, match="transfer weight"):
+        skills.practice(
+            "sword",
+            PracticeEvent(
+                difficulty=60.0,
+                duration_hours=1.0,
+                context="forms",
+            ),
+        )
+    assert skills.skills == {}
+
+
+def test_lod_round_trip_preserves_skill_configuration_without_aliasing() -> None:
+    actor = WorldActor(
+        SpatialEntity("actor", "Actor", Vec3(0.0, 0.0, 0.0)),
+        Mind(),
+        Physiology(70.0),
+        Loadout(70.0),
+    )
+    actor.skills.learning_rate = 1.4
+    actor.skills.baseline_level = 20.0
+    actor.skills.transfers = {"sword": {"knife": 0.2}}
+    actor.skills.practice(
+        "tracking",
+        PracticeEvent(
+            difficulty=65.0,
+            duration_hours=2.0,
+            quality=0.9,
+            context="forest",
+        ),
+    )
+    original_knowledge = actor.skills.skills["tracking"].knowledge
+
+    state = abstract_actor(actor, tier=SimulationLOD.REGION, now=10.0)
+    state.skills.learning_rate = 9.0
+    state.skills.skills["tracking"].knowledge = 0.0
+    state.skills.transfers["sword"]["knife"] = 1.0
+
+    assert actor.skills.learning_rate == pytest.approx(1.4)
+    assert actor.skills.skills["tracking"].knowledge == pytest.approx(
+        original_knowledge
+    )
+    assert actor.skills.transfers["sword"]["knife"] == pytest.approx(0.2)
+
+    restored = restore_actor(state)
+    assert restored.skills.learning_rate == pytest.approx(9.0)
+    assert restored.skills.baseline_level == pytest.approx(20.0)
+    assert restored.skills.transfers == {"sword": {"knife": 1.0}}
+    assert restored.skills.skills["tracking"].practice_counts == {"forest": 1}
+    restored.skills.practice(
+        "tracking",
+        PracticeEvent(
+            difficulty=65.0,
+            duration_hours=1.0,
+            context="forest",
+        ),
+    )
+    assert actor.skills.skills["tracking"].practice_counts == {"forest": 1}
