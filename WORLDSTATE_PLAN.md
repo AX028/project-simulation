@@ -62,22 +62,29 @@ The validation runner is `scripts/validate.py`.
   OPEN, CLOSE, SHOOT, HELP, and QUIT.
 - Real time advancement drives physiology, ambient NPC routines, and macro events.
 - Event-sourced deterministic replay saves with state digests and tamper detection.
-- Replay digest currently covers actor/combat state, inventory/world items, doors, ranged weapons,
-  sound events, heard memories, scenery, time, transcript, and command history.
+- Replay schema 2 authenticates actor/combat state, inventory/world items, doors, ranged weapons,
+  sound events, heard memories, scenery, time, transcript, command history, authoritative
+  environment fields, and per-actor skill configuration. Schema 1 saves still load under the
+  original digest. Saves are `build_demo_session(seed)` plus command history; custom initial
+  state is rejected.
+- Environmental clock, kernel time, and elapsed session time advance by the same duration and
+  keep any initial offset. Wetness evolution is timestep-sensitive; world hour is linear.
+- Versioned macro checkpoints store world state, pending events, and the next event sequence in
+  one file. Handlers are registered on the destination kernel and are not part of the file.
+  Legacy world and event-queue stores remain separate.
 
 ## Current implementation priorities
 
-1. Environmental state: time-of-day light, weather, wind, precipitation, and temperature as shared
-   inputs to vision, projectile drift, sound, movement, and physiology.
-2. Skills/progression: use/training/instruction gains with difficulty, novelty, transfer, and
-   performance derived from skill + physiology + context.
-3. More complete world-object interaction: containers in the scene, item accessibility, breaking
+1. More complete world-object interaction: containers in the scene, item accessibility, breaking
    objects, and construction/destruction.
-4. Automatic macro coupling: settlement production, migration, faction activity, and information
+2. Automatic macro coupling: settlement production, migration, faction activity, and information
    propagation driven continuously by event schedules.
-5. Higher-detail persistence/checkpoints so very long replay histories can compact safely.
-6. Larger authored/procedural prototype region with several buildings, professions, wildlife, and
+3. Full-session checkpoint compaction after an inventory of actor/combat aliases, physiology,
+   cognition, skills, inventories, environment, RNG, schedules, event order, and world time.
+4. Larger authored/procedural prototype region with several buildings, professions, wildlife, and
    competing factions.
+5. Training and instruction commands are not part of the text-world language yet. Archery practice
+   is recorded, while aim points stay geometric; melee performance already uses skill.
 
 ## Testing strategy
 

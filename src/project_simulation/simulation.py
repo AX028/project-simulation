@@ -6,7 +6,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import IntEnum
 from heapq import heapify, heappop, heappush
-from itertools import count
 
 from .validation import finite_number, nonnegative_number
 
@@ -81,7 +80,7 @@ class SimulationKernel:
     def __init__(self, world: WorldState) -> None:
         self.world = world
         self._events: list[ScheduledEvent] = []
-        self._counter = count()
+        self._next_sequence = 0
         self._handlers: dict[str, EventHandler] = {
             "wolf_attack": self._wolf_attack,
             "faction_conflict": self._faction_conflict,
@@ -97,7 +96,8 @@ class SimulationKernel:
         at = finite_number(at, "event time")
         if at < self.world.time_hours:
             raise ValueError("scheduled events may not occur before world time")
-        event = ScheduledEvent(at, next(self._counter), kind, dict(payload))
+        event = ScheduledEvent(at, self._next_sequence, kind, dict(payload))
+        self._next_sequence += 1
         heappush(self._events, event)
         return event
 
@@ -115,41 +115,95 @@ class SimulationKernel:
             handler(self.world, event)
         self.world.time_hours = target_hour
 
+    @property
+    def next_event_sequence(self) -> int:
+        """Sequence number that the next scheduled event will receive."""
+        return self._next_sequence
+
     def pending_events(self) -> tuple[ScheduledEvent, ...]:
         """Return an immutable, sorted copy of future scheduled events."""
-        return tuple(
-            ScheduledEvent(
-                event.at,
-                event.sequence,
-                event.kind,
-                dict(event.payload),
-            )
-            for event in sorted(self._events)
-        )
+        return tuple(self._copy_event(event) for event in sorted(self._events))
 
-    def replace_pending_events(self, events: Iterable[ScheduledEvent]) -> None:
-        """Replace the queue while preserving deterministic sequence ordering."""
-        restored = [
-            ScheduledEvent(
-                event.at,
-                event.sequence,
-                event.kind,
-                dict(event.payload),
-            )
-            for event in events
-        ]
-        for event in restored:
-            finite_number(event.at, "event time")
-            nonnegative_number(event.sequence, "event sequence")
-            if event.at < self.world.time_hours:
-                raise ValueError("pending events may not occur before world time")
-        sequences = [event.sequence for event in restored]
-        if len(sequences) != len(set(sequences)):
-            raise ValueError("pending event sequence numbers must be unique")
+    def replace_pending_events(
+        self,
+        events: Iterable[ScheduledEvent],
+        *,
+        next_sequence: int | None = None,
+    ) -> None:
+        """Replace the queue while preserving deterministic sequence ordering.
+
+        When ``next_sequence`` is omitted, the next scheduled event continues
+        after the highest restored sequence. An explicit value is required when
+        the pending queue is empty but earlier events have already consumed
+        sequence numbers.
+        """
+        restored = [self._copy_event(event) for event in events]
+        chosen = self._validated_next_sequence(
+            restored,
+            world_time=self.world.time_hours,
+            next_sequence=next_sequence,
+        )
         self._events = restored
         heapify(self._events)
-        next_sequence = max(sequences, default=-1) + 1
-        self._counter = count(next_sequence)
+        self._next_sequence = chosen
+
+    def restore_macro_continuation(
+        self,
+        world: WorldState,
+        events: Iterable[ScheduledEvent],
+        *,
+        next_sequence: int,
+    ) -> None:
+        """Install world, pending events, and the next sequence together.
+
+        Validation finishes before any live field changes. A rejected restore
+        leaves this kernel unchanged. Event handlers are not replaced.
+        """
+        restored = [self._copy_event(event) for event in events]
+        chosen = self._validated_next_sequence(
+            restored,
+            world_time=world.time_hours,
+            next_sequence=next_sequence,
+        )
+        self.world = world
+        self._events = restored
+        heapify(self._events)
+        self._next_sequence = chosen
+
+    @staticmethod
+    def _copy_event(event: ScheduledEvent) -> ScheduledEvent:
+        return ScheduledEvent(
+            event.at,
+            event.sequence,
+            event.kind,
+            dict(event.payload),
+        )
+
+    @staticmethod
+    def _validated_next_sequence(
+        events: list[ScheduledEvent],
+        *,
+        world_time: float,
+        next_sequence: int | None,
+    ) -> int:
+        for event in events:
+            finite_number(event.at, "event time")
+            nonnegative_number(event.sequence, "event sequence")
+            if event.at < world_time:
+                raise ValueError("pending events may not occur before world time")
+        sequences = [event.sequence for event in events]
+        if len(sequences) != len(set(sequences)):
+            raise ValueError("pending event sequence numbers must be unique")
+        derived = max(sequences, default=-1) + 1
+        if next_sequence is None:
+            return derived
+        if isinstance(next_sequence, bool) or not isinstance(next_sequence, int):
+            raise TypeError("next event sequence must be an integer")
+        if next_sequence < derived:
+            raise ValueError(
+                "next event sequence must be greater than every pending sequence"
+            )
+        return next_sequence
 
     def choose_lod(self, distance_m: float, important: bool = False) -> SimulationLOD:
         distance_m = nonnegative_number(distance_m, "LOD distance")

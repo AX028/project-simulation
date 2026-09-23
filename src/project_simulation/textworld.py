@@ -223,13 +223,15 @@ class TextWorldSession:
             if self.ambient is not None
             else frozenset()
         )
-        start_world_hour = (
+        # Kernel time drives macro events and NPC routines. The environmental
+        # clock is sampled as it stands, then both clocks advance by the same
+        # duration. Do not overwrite world_hour; that discarded the configured
+        # time of day on the first action.
+        schedule_hour = (
             self.kernel.world.time_hours
             if self.kernel is not None
             else self.elapsed_seconds / 3600.0
         )
-
-        self.environment.world_hour = start_world_hour
         ambient_c = self.environment.ambient_temperature_c
         speed_multiplier = self.environment.movement_speed_multiplier
 
@@ -244,7 +246,7 @@ class TextWorldSession:
 
         if self.ambient is not None:
             self.ambient.advance(
-                start_world_hour=start_world_hour,
+                start_world_hour=schedule_hour,
                 seconds=seconds,
                 skip_actor_ids=frozenset(skipped),
                 ambient_c=ambient_c,

@@ -24,7 +24,6 @@ from project_simulation import (
 from project_simulation.models import ResourcePool
 from project_simulation.spatial import Bounds
 
-
 DETERMINISTIC = settings(
     max_examples=100,
     deadline=None,
