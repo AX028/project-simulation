@@ -35,6 +35,7 @@ The validation runner is `scripts/validate.py`.
 - Blood loss, pain, fatigue, hydration, nutrition reserve, sleep debt, and temperature.
 - Physical inventory based on mass, volume, dimensions, containers, accessibility, and continuous
   encumbrance.
+- Openable scene containers with constrained storage, explicit access time, and take/put flows.
 - Ranged weapons, ammunition, anatomical aiming, obstruction/interception, door damage, and
   projectile wounds.
 
@@ -58,7 +59,7 @@ The validation runner is `scripts/validate.py`.
 - Versioned WORLDSTATE macro persistence and scheduled-event queue persistence.
 
 ### Playable deterministic text world
-- LOOK, MOVE, INSPECT, MAP, STATUS, WAIT, ATTACK, ADVANCE, TAKE, DROP, INVENTORY, TALK,
+- LOOK, MOVE, INSPECT, MAP, STATUS, WAIT, ATTACK, ADVANCE, TAKE, PUT, DROP, INVENTORY, TALK,
   OPEN, CLOSE, SHOOT, HELP, and QUIT.
 - Real time advancement drives physiology, ambient NPC routines, and macro events.
 - Event-sourced deterministic replay saves with state digests and tamper detection.
@@ -71,8 +72,7 @@ The validation runner is `scripts/validate.py`.
    inputs to vision, projectile drift, sound, movement, and physiology.
 2. Skills/progression: use/training/instruction gains with difficulty, novelty, transfer, and
    performance derived from skill + physiology + context.
-3. More complete world-object interaction: containers in the scene, item accessibility, breaking
-   objects, and construction/destruction.
+3. More complete world-object interaction: breaking objects and construction/destruction.
 4. Automatic macro coupling: settlement production, migration, faction activity, and information
    propagation driven continuously by event schedules.
 5. Higher-detail persistence/checkpoints so very long replay histories can compact safely.

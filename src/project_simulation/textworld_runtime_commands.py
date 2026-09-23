@@ -111,9 +111,10 @@ def help_text(
     return (
         "Commands: look, map, move <direction> [m], "
         "advance <target> [s], attack <target> [body_part], "
-        "inspect <target>, wait [s], status, take <item>, "
+        "inspect <target>, wait [s], status, "
+        "take <item> [from <container>], put <item> in <container>, "
         "drop <item>, inventory, talk <target> [topic], "
-        "open <door>, close <door>, shoot <target> [body_part], "
+        "open <object>, close <object>, shoot <target> [body_part], "
         "help, quit.",
         False,
     )

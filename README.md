@@ -36,6 +36,7 @@ The current branch includes:
 - body-part combat, armor durability, blood loss, pain, fatigue, hydration, temperature, and
   location-specific injuries;
 - physical inventory based on mass, volume, containers, accessibility, and encumbrance;
+- openable scene containers with capacity-constrained take/put interactions;
 - NPC beliefs separated from objective truth, selective memories, multidimensional relationships,
   utility decisions, GOAP planning, routines, and ambient world movement;
 - delayed rumor propagation and belief-grounded dialogue;
@@ -45,8 +46,8 @@ The current branch includes:
   and event-driven macro simulation;
 - five simulation LOD tiers with actor compression/restoration;
 - versioned world-state and scheduled-event persistence;
-- a playable deterministic text-world session with LOOK, MOVE, INSPECT, TALK, TAKE, DROP, WAIT,
-  ATTACK, SHOOT, OPEN, CLOSE, inventory/status/map commands, and event-sourced replay saves.
+- a playable deterministic text-world session with LOOK, MOVE, INSPECT, TALK, TAKE, PUT, DROP,
+  WAIT, ATTACK, SHOOT, OPEN, CLOSE, inventory/status/map commands, and event-sourced replay saves.
 
 See [WORLDSTATE_PLAN.md](WORLDSTATE_PLAN.md) for implementation status and next work.
 

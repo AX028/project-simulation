@@ -89,6 +89,41 @@ def session_digest(session: TextWorldSession) -> str:
             }
             for door_id, door in sorted(session.doors.items())
         },
+        "scene_containers": {
+            container_id: {
+                "name": container.name,
+                "open": container.is_open,
+                "locked": container.locked,
+                "position": [
+                    round(container.spatial.position.x, 9),
+                    round(container.spatial.position.y, 9),
+                    round(container.spatial.position.z, 9),
+                ],
+                "max_volume_l": round(container.storage.max_volume_l, 9),
+                "max_length_m": round(container.storage.max_length_m, 9),
+                "retrieval_penalty_s": round(
+                    container.storage.retrieval_penalty_s,
+                    9,
+                ),
+                "items": [
+                    {
+                        "id": item.item_id,
+                        "name": item.name,
+                        "mass_kg": round(item.mass_kg, 9),
+                        "volume_l": round(item.volume_l, 9),
+                        "length_m": round(item.length_m, 9),
+                        "accessibility_s": round(item.accessibility_s, 9),
+                    }
+                    for item in sorted(
+                        container.items,
+                        key=lambda value: value.item_id,
+                    )
+                ],
+            }
+            for container_id, container in sorted(
+                session.scene_containers.items()
+            )
+        },
         "world_items": {
             item_id: {
                 "name": item.name,

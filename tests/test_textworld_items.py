@@ -1,6 +1,11 @@
 import pytest
 
-from project_simulation import build_demo_session, session_digest
+from project_simulation import Vec3, build_demo_session, session_digest
+
+
+def _stand_by_barrel(session) -> None:
+    session.player.spatial.position = Vec3(2.0, 3.0, 0.0)
+    session.player.spatial.facing = Vec3(1.0, 0.0, 0.0)
 
 
 def test_take_moves_item_from_world_to_inventory() -> None:
@@ -106,3 +111,105 @@ def test_inventory_command_does_not_advance_time() -> None:
     before = session.elapsed_seconds
     session.execute("inventory")
     assert session.elapsed_seconds == before
+
+
+def test_closed_scene_container_hides_and_protects_contents() -> None:
+    session = build_demo_session(5)
+    _stand_by_barrel(session)
+
+    inspection = session.execute("inspect barrel").output
+
+    assert "closed" in inspection
+    assert "Apple" not in inspection
+    with pytest.raises(ValueError, match="closed"):
+        session.execute("take apple from barrel")
+    assert [item.item_id for item in session.scene_containers["barrel"].items] == [
+        "apple"
+    ]
+
+
+def test_open_scene_container_exposes_and_transfers_item() -> None:
+    session = build_demo_session(5)
+    _stand_by_barrel(session)
+    session.execute("open barrel")
+    before_take = session.elapsed_seconds
+
+    inspection = session.execute("inspect barrel").output
+    result = session.execute("take apple from barrel")
+
+    assert "contents: Apple" in inspection
+    assert "take Apple from Barrel" in result.output
+    assert session.elapsed_seconds - before_take == pytest.approx(1.9)
+    assert [item.item_id for item in session.player.loadout.carried_loose] == [
+        "apple"
+    ]
+    assert session.scene_containers["barrel"].items == ()
+
+
+def test_put_returns_item_to_open_scene_container() -> None:
+    session = build_demo_session(5)
+    _stand_by_barrel(session)
+    session.execute("open barrel")
+    session.execute("take apple from barrel")
+    before_put = session.elapsed_seconds
+
+    result = session.execute("put apple in barrel")
+
+    assert "put Apple in Barrel" in result.output
+    assert session.elapsed_seconds - before_put == pytest.approx(1.9)
+    assert session.player.loadout.carried_loose == []
+    assert [item.item_id for item in session.scene_containers["barrel"].items] == [
+        "apple"
+    ]
+
+
+def test_failed_put_is_atomic_when_item_does_not_fit() -> None:
+    session = build_demo_session(5)
+    session.execute("take rope")
+    _stand_by_barrel(session)
+    session.execute("open barrel")
+
+    with pytest.raises(ValueError, match="does not fit"):
+        session.execute("put rope in barrel")
+
+    assert [item.item_id for item in session.player.loadout.carried_loose] == [
+        "rope"
+    ]
+    assert [item.item_id for item in session.scene_containers["barrel"].items] == [
+        "apple"
+    ]
+
+
+def test_scene_container_replay_is_deterministic() -> None:
+    commands = (
+        "move east 2",
+        "move north 3",
+        "move east 0.1",
+        "open barrel",
+        "inspect barrel",
+        "take apple from barrel",
+        "inventory",
+        "put apple in barrel",
+        "close barrel",
+    )
+    first = build_demo_session(29)
+    second = build_demo_session(29)
+
+    assert first.replay(commands) == second.replay(commands)
+    assert session_digest(first) == session_digest(second)
+
+
+def test_repeated_container_transfers_preserve_item_mass() -> None:
+    session = build_demo_session(5)
+    _stand_by_barrel(session)
+    session.execute("open barrel")
+    initial_mass = session.scene_containers["barrel"].items[0].mass_kg
+
+    for _ in range(100):
+        session.execute("take apple from barrel")
+        assert session.player.loadout.carried_mass_kg == pytest.approx(initial_mass)
+        session.execute("put apple in barrel")
+        assert session.player.loadout.carried_mass_kg == 0.0
+        assert session.scene_containers["barrel"].items[0].mass_kg == pytest.approx(
+            initial_mass
+        )

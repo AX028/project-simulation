@@ -166,6 +166,7 @@ from .textworld import (
     parse_command,
 )
 from .textworld_replay import TextWorldReplayStore, session_digest
+from .world_objects import SceneContainer
 from .worldstate import WorldActor
 from .worldstate_persistence import WorldStateStore
 
@@ -281,6 +282,7 @@ __all__ = [
     "SocialLink",
     "RumorNetwork",
     "RumorDelivery",
+    "SceneContainer",
     "RoutineBlock",
     "RoutineDecision",
     "RoutineSchedule",

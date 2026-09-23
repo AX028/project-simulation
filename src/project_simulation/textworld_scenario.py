@@ -11,13 +11,14 @@ from .content import create_character, create_enemy
 from .doors import Door, PassageAxis
 from .environment import EnvironmentState
 from .npc_controller import NPCController
-from .physiology import Loadout, PhysicalItem, Physiology
+from .physiology import Container, Loadout, PhysicalItem, Physiology
 from .projectiles import ProjectileSpec
 from .ranged import RangedWeapon
 from .schedules import RoutineBlock, RoutineSchedule
 from .simulation import SimulationKernel, WorldState
 from .spatial import Bounds, SpatialEntity, Vec3
 from .spatial_combat import SpatialCombatant, WeaponPhysics
+from .world_objects import SceneContainer
 from .worldstate import WorldActor
 
 if TYPE_CHECKING:
@@ -112,7 +113,15 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         length_m=8.0,
         accessibility_s=1.0,
     )
-    scenery = (
+    apple = PhysicalItem(
+        "apple",
+        "Apple",
+        mass_kg=0.2,
+        volume_l=0.35,
+        length_m=0.1,
+        accessibility_s=0.4,
+    )
+    barrel = SceneContainer(
         SpatialEntity(
             "barrel",
             "Barrel",
@@ -121,6 +130,15 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
             mass_kg=35.0,
             tags=frozenset({"cover", "occluder", "solid"}),
         ),
+        Container(
+            "Barrel",
+            max_volume_l=80.0,
+            max_length_m=1.0,
+            retrieval_penalty_s=1.5,
+            items=[apple],
+        ),
+    )
+    scenery = (
         SpatialEntity(
             "rope",
             "Rope",
@@ -199,6 +217,7 @@ def build_demo_session(seed: int = 42) -> TextWorldSession:
         rng=random.Random(seed),
         scenery=scenery,
         world_items={"rope": rope},
+        scene_containers={"barrel": barrel},
         doors={"gate": gate},
         ranged_weapons={player_actor.actor_id: hunting_bow},
         environment=EnvironmentState(world_hour=0.0),
