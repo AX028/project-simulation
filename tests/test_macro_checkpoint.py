@@ -1,5 +1,7 @@
 import json
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -38,6 +40,8 @@ def _world() -> WorldState:
                 wealth=1000.0,
                 military_power=10.0,
                 territory=2.0,
+                relations={"b": 0.25},
+                institutional_memory={"treaty:b": 0.5},
             ),
             "b": FactionState(
                 "b",
@@ -49,6 +53,25 @@ def _world() -> WorldState:
             ),
         },
     )
+
+
+def _checkpoint_payload(tmp_path) -> tuple[Path, dict[str, Any]]:
+    kernel = SimulationKernel(_world())
+    kernel.schedule(20.0, "wolf_attack", settlement_id="v", severity=0.2)
+    path = tmp_path / "macro.json"
+    MacroCheckpointStore.write(kernel, path)
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
+def _replace_path(
+    payload: dict[str, Any],
+    path: tuple[str | int, ...],
+    value: object,
+) -> None:
+    target: Any = payload
+    for component in path[:-1]:
+        target = target[component]
+    target[path[-1]] = value
 
 
 def test_checkpoint_resume_matches_uninterrupted_advance(tmp_path) -> None:
@@ -222,6 +245,155 @@ def test_rejected_restore_leaves_the_live_kernel_unchanged(tmp_path) -> None:
     assert kernel.world.history == before_history
     assert kernel.world.time_hours == pytest.approx(10.0)
     assert "v" in kernel.world.settlements
+
+
+@pytest.mark.parametrize(
+    ("field_path", "invalid"),
+    [
+        pytest.param(("world", "time_hours"), float("nan"), id="world-time"),
+        pytest.param(
+            ("world", "settlements", "v", "food_units"),
+            float("inf"),
+            id="settlement-resource",
+        ),
+        pytest.param(
+            ("world", "settlements", "v", "prices", "food"),
+            float("-inf"),
+            id="commodity-price",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "military_power"),
+            float("nan"),
+            id="faction-resource",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "relations", "b"),
+            float("inf"),
+            id="faction-relation",
+        ),
+        pytest.param(("events", 0, "at"), float("nan"), id="event-time"),
+        pytest.param(
+            ("events", 0, "payload", "severity"),
+            float("inf"),
+            id="event-payload",
+        ),
+    ],
+)
+def test_nonfinite_checkpoint_numbers_are_rejected(
+    tmp_path,
+    field_path: tuple[str | int, ...],
+    invalid: float,
+) -> None:
+    path, payload = _checkpoint_payload(tmp_path)
+    _replace_path(payload, field_path, invalid)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(IncompatibleSaveError, match="finite"):
+        MacroCheckpointStore.read_into(SimulationKernel(_world()), path)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "invalid"),
+    [
+        pytest.param(("world", "time_hours"), -1.0, id="negative-world-time"),
+        pytest.param(
+            ("world", "settlements", "v", "population"),
+            -1,
+            id="negative-population",
+        ),
+        pytest.param(
+            ("world", "settlements", "v", "food_units"),
+            -0.1,
+            id="negative-food",
+        ),
+        pytest.param(
+            ("world", "settlements", "v", "security"),
+            10.1,
+            id="security-above-range",
+        ),
+        pytest.param(
+            ("world", "settlements", "v", "labor", "farmer"),
+            -1,
+            id="negative-labor",
+        ),
+        pytest.param(
+            ("world", "settlements", "v", "prices", "food"),
+            0.0,
+            id="nonpositive-price",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "members"),
+            -1,
+            id="negative-members",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "territory"),
+            -0.1,
+            id="negative-territory",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "relations", "b"),
+            1.1,
+            id="relation-above-range",
+        ),
+        pytest.param(
+            ("world", "factions", "a", "institutional_memory", "treaty:b"),
+            -0.1,
+            id="negative-memory",
+        ),
+        pytest.param(("events", 0, "at"), 9.0, id="event-before-world-time"),
+        pytest.param(("events", 0, "sequence"), -1, id="negative-event-sequence"),
+        pytest.param(("next_event_sequence",), -1, id="negative-next-sequence"),
+    ],
+)
+def test_out_of_domain_checkpoint_numbers_are_rejected(
+    tmp_path,
+    field_path: tuple[str | int, ...],
+    invalid: int | float,
+) -> None:
+    path, payload = _checkpoint_payload(tmp_path)
+    _replace_path(payload, field_path, invalid)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(IncompatibleSaveError):
+        MacroCheckpointStore.read_into(SimulationKernel(_world()), path)
+
+
+@pytest.mark.parametrize("collection", ["settlements", "factions"])
+def test_duplicate_world_entity_ids_are_rejected(tmp_path, collection: str) -> None:
+    path, payload = _checkpoint_payload(tmp_path)
+    entities = payload["world"][collection]
+    entities["duplicate"] = deepcopy(next(iter(entities.values())))
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(IncompatibleSaveError, match="duplicate"):
+        MacroCheckpointStore.read_into(SimulationKernel(_world()), path)
+
+
+def test_domain_validation_failure_is_atomic_for_world_queue_and_sequence(
+    tmp_path,
+) -> None:
+    kernel = SimulationKernel(_world())
+    kernel.schedule(30.0, "record", value="live")
+    kernel.world.history.append("live history")
+    original_world = kernel.world
+    before_world = deepcopy(kernel.world)
+    before_events = kernel.pending_events()
+    before_sequence = kernel.next_event_sequence
+
+    path, payload = _checkpoint_payload(tmp_path)
+    payload["world"]["settlements"]["duplicate"] = deepcopy(
+        payload["world"]["settlements"]["v"]
+    )
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(IncompatibleSaveError, match="duplicate settlement"):
+        MacroCheckpointStore.read_into(kernel, path)
+
+    assert kernel.world is original_world
+    assert kernel.world == before_world
+    assert kernel.pending_events() == before_events
+    assert kernel.next_event_sequence == before_sequence
 
 
 def test_legacy_world_store_is_not_a_macro_checkpoint(tmp_path) -> None:

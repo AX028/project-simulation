@@ -14,6 +14,7 @@ separate and are not rewritten here.
 from __future__ import annotations
 
 import json
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -156,16 +157,16 @@ def _world_from_raw(raw: object) -> WorldState:
             settlement_id=value["settlement_id"],
             name=value["name"],
             population=_require_int(value["population"], "population"),
-            food_units=float(value["food_units"]),
-            wealth=float(value["wealth"]),
-            security=float(value["security"]),
-            livestock=float(value["livestock"]),
+            food_units=_require_finite_float(value["food_units"], "food units"),
+            wealth=_require_finite_float(value["wealth"], "settlement wealth"),
+            security=_require_finite_float(value["security"], "security"),
+            livestock=_require_finite_float(value["livestock"], "livestock"),
             labor={
                 str(labor_key): _require_int(labor_value, "labor")
                 for labor_key, labor_value in value["labor"].items()
             },
             prices={
-                str(price_key): float(price_value)
+                str(price_key): _require_finite_float(price_value, "price")
                 for price_key, price_value in value["prices"].items()
             },
         )
@@ -176,15 +177,24 @@ def _world_from_raw(raw: object) -> WorldState:
             faction_id=value["faction_id"],
             name=value["name"],
             members=_require_int(value["members"], "members"),
-            wealth=float(value["wealth"]),
-            military_power=float(value["military_power"]),
-            territory=float(value["territory"]),
+            wealth=_require_finite_float(value["wealth"], "faction wealth"),
+            military_power=_require_finite_float(
+                value["military_power"],
+                "military power",
+            ),
+            territory=_require_finite_float(value["territory"], "territory"),
             relations={
-                str(relation_key): float(relation_value)
+                str(relation_key): _require_finite_float(
+                    relation_value,
+                    "relation",
+                )
                 for relation_key, relation_value in value["relations"].items()
             },
             institutional_memory={
-                str(memory_key): float(memory_value)
+                str(memory_key): _require_finite_float(
+                    memory_value,
+                    "institutional memory",
+                )
                 for memory_key, memory_value in value[
                     "institutional_memory"
                 ].items()
@@ -192,11 +202,16 @@ def _world_from_raw(raw: object) -> WorldState:
         )
         for key, value in raw["factions"].items()
     }
+    history = raw["history"]
+    if not isinstance(history, list) or not all(
+        isinstance(item, str) for item in history
+    ):
+        raise TypeError("history must be a list of strings")
     return WorldState(
-        time_hours=float(raw["time_hours"]),
+        time_hours=_require_finite_float(raw["time_hours"], "world time"),
         settlements=settlements,
         factions=factions,
-        history=[str(item) for item in raw["history"]],
+        history=list(history),
     )
 
 
@@ -212,7 +227,10 @@ def _event_from_raw(raw: object) -> ScheduledEvent:
             raise TypeError("event payload keys must be strings")
         if isinstance(value, bool):
             payload[key] = value
-        elif isinstance(value, (str, int, float)):
+        elif isinstance(value, str):
+            payload[key] = value
+        elif isinstance(value, (int, float)):
+            _require_finite_float(value, "event payload number")
             payload[key] = value
         else:
             raise TypeError("unsupported event payload value")
@@ -220,7 +238,7 @@ def _event_from_raw(raw: object) -> ScheduledEvent:
     if not isinstance(kind, str) or not kind:
         raise TypeError("event kind must be a non-empty string")
     return ScheduledEvent(
-        at=float(raw["at"]),
+        at=_require_finite_float(raw["at"], "event time"),
         sequence=_require_int(raw["sequence"], "event sequence"),
         kind=kind,
         payload=payload,
@@ -231,3 +249,15 @@ def _require_int(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"{name} must be an integer")
     return value
+
+
+def _require_finite_float(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be a number")
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} must be finite") from exc
+    if not isfinite(number):
+        raise ValueError(f"{name} must be finite")
+    return number

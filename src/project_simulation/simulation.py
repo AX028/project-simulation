@@ -74,6 +74,115 @@ class WorldState:
 EventHandler = Callable[[WorldState, ScheduledEvent], None]
 
 
+def _strict_finite_number(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be a number")
+    try:
+        return finite_number(value, name)
+    except OverflowError as exc:
+        raise ValueError(f"{name} must be finite") from exc
+
+
+def _strict_nonnegative_number(value: object, name: str) -> float:
+    number = _strict_finite_number(value, name)
+    if number < 0:
+        raise ValueError(f"{name} may not be negative")
+    return number
+
+
+def _strict_nonnegative_int(value: object, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer")
+    if value < 0:
+        raise ValueError(f"{name} may not be negative")
+    return value
+
+
+def _nonempty_string(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise TypeError(f"{name} must be a non-empty string")
+    return value
+
+
+def _validate_macro_world(world: WorldState) -> None:
+    _strict_nonnegative_number(world.time_hours, "world time")
+
+    settlement_ids: set[str] = set()
+    for key, settlement in world.settlements.items():
+        _nonempty_string(key, "settlement key")
+        if not isinstance(settlement, SettlementState):
+            raise TypeError("settlements must contain settlement states")
+        settlement_id = _nonempty_string(settlement.settlement_id, "settlement id")
+        if settlement_id in settlement_ids:
+            raise ValueError(f"duplicate settlement id: {settlement_id}")
+        settlement_ids.add(settlement_id)
+        _nonempty_string(settlement.name, "settlement name")
+        _strict_nonnegative_int(settlement.population, "settlement population")
+        _strict_nonnegative_number(settlement.food_units, "settlement food")
+        _strict_nonnegative_number(settlement.wealth, "settlement wealth")
+        security = _strict_finite_number(settlement.security, "settlement security")
+        if not 0.0 <= security <= 10.0:
+            raise ValueError("settlement security must be between 0 and 10")
+        _strict_nonnegative_number(settlement.livestock, "settlement livestock")
+        for occupation, workers in settlement.labor.items():
+            _nonempty_string(occupation, "labor occupation")
+            _strict_nonnegative_int(workers, "labor population")
+        for commodity, price in settlement.prices.items():
+            _nonempty_string(commodity, "price commodity")
+            if _strict_finite_number(price, "commodity price") <= 0:
+                raise ValueError("commodity price must be positive")
+
+    faction_ids: set[str] = set()
+    for key, faction in world.factions.items():
+        _nonempty_string(key, "faction key")
+        if not isinstance(faction, FactionState):
+            raise TypeError("factions must contain faction states")
+        faction_id = _nonempty_string(faction.faction_id, "faction id")
+        if faction_id in faction_ids:
+            raise ValueError(f"duplicate faction id: {faction_id}")
+        faction_ids.add(faction_id)
+        _nonempty_string(faction.name, "faction name")
+        _strict_nonnegative_int(faction.members, "faction members")
+        _strict_nonnegative_number(faction.wealth, "faction wealth")
+        _strict_nonnegative_number(faction.military_power, "faction military power")
+        _strict_nonnegative_number(faction.territory, "faction territory")
+        for other_id, relation in faction.relations.items():
+            _nonempty_string(other_id, "relation faction id")
+            value = _strict_finite_number(relation, "faction relation")
+            if not -1.0 <= value <= 1.0:
+                raise ValueError("faction relation must be between -1 and 1")
+        for memory_key, strength in faction.institutional_memory.items():
+            _nonempty_string(memory_key, "institutional memory key")
+            value = _strict_finite_number(strength, "institutional memory strength")
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    "institutional memory strength must be between 0 and 1"
+                )
+
+    if not isinstance(world.history, list) or not all(
+        isinstance(item, str) for item in world.history
+    ):
+        raise TypeError("world history must be a list of strings")
+
+
+def _validate_event(event: ScheduledEvent, *, world_time: float) -> None:
+    event_time = _strict_finite_number(event.at, "event time")
+    _strict_nonnegative_int(event.sequence, "event sequence")
+    if event_time < world_time:
+        raise ValueError("pending events may not occur before world time")
+    _nonempty_string(event.kind, "event kind")
+    if not isinstance(event.payload, dict):
+        raise TypeError("event payload must be an object")
+    for key, value in event.payload.items():
+        _nonempty_string(key, "event payload key")
+        if isinstance(value, bool) or isinstance(value, str):
+            continue
+        if isinstance(value, (int, float)):
+            _strict_finite_number(value, "event payload number")
+            continue
+        raise TypeError("unsupported event payload value")
+
+
 class SimulationKernel:
     """Deterministic event queue. Distant systems advance through coarse events, not frames."""
 
@@ -159,6 +268,7 @@ class SimulationKernel:
         Validation finishes before any live field changes. A rejected restore
         leaves this kernel unchanged. Event handlers are not replaced.
         """
+        _validate_macro_world(world)
         restored = [self._copy_event(event) for event in events]
         chosen = self._validated_next_sequence(
             restored,
@@ -186,19 +296,19 @@ class SimulationKernel:
         world_time: float,
         next_sequence: int | None,
     ) -> int:
+        validated_world_time = _strict_nonnegative_number(
+            world_time,
+            "world time",
+        )
         for event in events:
-            finite_number(event.at, "event time")
-            nonnegative_number(event.sequence, "event sequence")
-            if event.at < world_time:
-                raise ValueError("pending events may not occur before world time")
+            _validate_event(event, world_time=validated_world_time)
         sequences = [event.sequence for event in events]
         if len(sequences) != len(set(sequences)):
             raise ValueError("pending event sequence numbers must be unique")
         derived = max(sequences, default=-1) + 1
         if next_sequence is None:
             return derived
-        if isinstance(next_sequence, bool) or not isinstance(next_sequence, int):
-            raise TypeError("next event sequence must be an integer")
+        _strict_nonnegative_int(next_sequence, "next event sequence")
         if next_sequence < derived:
             raise ValueError(
                 "next event sequence must be greater than every pending sequence"
