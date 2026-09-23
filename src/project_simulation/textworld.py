@@ -25,6 +25,7 @@ from .textworld_commands import (
     parse_command,
 )
 from .validation import positive_number
+from .world_objects import SceneContainer
 from .worldstate import WorldActor
 
 
@@ -47,6 +48,7 @@ class TextWorldSession:
     transcript: list[str] = field(default_factory=list)
     seed: int | None = None
     command_history: list[str] = field(default_factory=list)
+    scene_containers: dict[str, SceneContainer] = field(default_factory=dict)
 
     @property
     def player(self) -> WorldActor:
@@ -57,6 +59,7 @@ class TextWorldSession:
         return [
             *(actor.spatial for actor in self.actors.values()),
             *self.scenery,
+            *(container.spatial for container in self.scene_containers.values()),
             *(door.spatial for door in self.doors.values()),
         ]
 
@@ -72,6 +75,7 @@ class TextWorldSession:
             CommandKind.WAIT: self._wait,
             CommandKind.STATUS: self._status,
             CommandKind.TAKE: self._take,
+            CommandKind.PUT: self._put,
             CommandKind.DROP: self._drop,
             CommandKind.INVENTORY: self._inventory,
             CommandKind.TALK: self._talk,
@@ -145,6 +149,11 @@ class TextWorldSession:
         from .textworld_interactions import drop
 
         return drop(self, args)
+
+    def _put(self, args: tuple[str, ...]) -> tuple[str, bool]:
+        from .textworld_interactions import put
+
+        return put(self, args)
 
     def _inventory(self, args: tuple[str, ...]) -> tuple[str, bool]:
         from .textworld_interactions import inventory

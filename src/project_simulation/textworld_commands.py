@@ -17,6 +17,7 @@ class CommandKind(StrEnum):
     WAIT = "wait"
     STATUS = "status"
     TAKE = "take"
+    PUT = "put"
     DROP = "drop"
     INVENTORY = "inventory"
     TALK = "talk"

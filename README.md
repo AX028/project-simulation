@@ -30,12 +30,16 @@ machine-learning runtime is required.
 The current branch includes:
 
 - true XYZ spatial entities with dimensions, facing, velocity, visibility, elevation, and LOS;
+- shared time-of-day and weather state affecting vision, sound, movement, projectiles, and
+  physiology;
 - swept movement collision, solid cover, doors, passage clearance, and oversized-actor rejection;
 - deterministic projectile trajectories with gravity, drag, lifetime, anti-tunneling sweeps, and
   anatomical ranged impacts;
 - body-part combat, armor durability, blood loss, pain, fatigue, hydration, temperature, and
   location-specific injuries;
 - physical inventory based on mass, volume, containers, accessibility, and encumbrance;
+- openable scene containers with capacity-constrained take/put interactions;
+- deterministic skill practice, training modes, novelty, transfer, and contextual performance;
 - NPC beliefs separated from objective truth, selective memories, multidimensional relationships,
   utility decisions, GOAP planning, routines, and ambient world movement;
 - delayed rumor propagation and belief-grounded dialogue;
@@ -45,8 +49,8 @@ The current branch includes:
   and event-driven macro simulation;
 - five simulation LOD tiers with actor compression/restoration;
 - versioned world-state and scheduled-event persistence;
-- a playable deterministic text-world session with LOOK, MOVE, INSPECT, TALK, TAKE, DROP, WAIT,
-  ATTACK, SHOOT, OPEN, CLOSE, inventory/status/map commands, and event-sourced replay saves.
+- a playable deterministic text-world session with LOOK, MOVE, INSPECT, TALK, TAKE, PUT, DROP,
+  WAIT, ATTACK, SHOOT, OPEN, CLOSE, inventory/status/map commands, and event-sourced replay saves.
 
 See [WORLDSTATE_PLAN.md](WORLDSTATE_PLAN.md) for implementation status and next work.
 

@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING
 
 from .dialogue import converse
 from .doors import Door
+from .physiology import PhysicalItem
 from .spatial import Bounds, SpatialEntity
 from .textui import narrative_view, tactical_map
+from .world_objects import SceneContainer
 
 if TYPE_CHECKING:
     from .textworld import TextWorldSession
@@ -52,12 +54,22 @@ def inspect(
     )
     if observation is None:
         return "You cannot currently perceive that target.", False
-    return (
+    description = (
         f"{observation.description}; {observation.distance_m:.2f} m "
         f"{observation.bearing.lower()}, elevation "
-        f"{observation.elevation_m:+.2f} m, clarity {observation.clarity:.2f}.",
-        False,
+        f"{observation.elevation_m:+.2f} m, clarity {observation.clarity:.2f}."
     )
+    container = session.scene_containers.get(target.entity_id)
+    if container is None:
+        return description, False
+    if not container.is_open:
+        return f"{description} It is closed.", False
+    if not container.items:
+        return f"{description} It is open and empty.", False
+    contents = ", ".join(
+        item.name for item in sorted(container.items, key=lambda item: item.item_id)
+    )
+    return f"{description} It is open; contents: {contents}.", False
 
 
 def take(
@@ -66,7 +78,20 @@ def take(
 ) -> tuple[str, bool]:
     from .spatial import observe
 
-    session._expect_count(args, 1, "take <item>")
+    if len(args) == 3 and args[1].lower() == "from":
+        container = resolve_scene_container(session, args[2])
+        require_container_reach(session, container)
+        item = container.take(args[0])
+        session.player.loadout.carried_loose.append(item)
+        session._advance_clock(container.access_time(item))
+        return (
+            f"You take {item.name} from {container.name}. Carried mass: "
+            f"{session.player.loadout.carried_mass_kg:.2f} kg.",
+            False,
+        )
+    if len(args) != 1:
+        raise ValueError("usage: take <item> [from <container>]")
+
     entity = session._resolve_entity(args[0])
     try:
         item = session.world_items[entity.entity_id]
@@ -82,6 +107,8 @@ def take(
         session.player.spatial,
         entity,
         session.player.vision,
+        illumination=session.environment.illumination,
+        contrast=session.environment.contrast_multiplier,
         obstacles=session.entities,
     )
     if observation is None:
@@ -102,23 +129,31 @@ def take(
     )
 
 
+def put(
+    session: TextWorldSession,
+    args: tuple[str, ...],
+) -> tuple[str, bool]:
+    if len(args) != 3 or args[1].lower() != "in":
+        raise ValueError("usage: put <item> in <container>")
+    item = resolve_carried_item(session, args[0])
+    container = resolve_scene_container(session, args[2])
+    require_container_reach(session, container)
+    container.put(item)
+    session.player.loadout.carried_loose.remove(item)
+    session._advance_clock(container.access_time(item))
+    return (
+        f"You put {item.name} in {container.name}. Carried mass: "
+        f"{session.player.loadout.carried_mass_kg:.2f} kg.",
+        False,
+    )
+
+
 def drop(
     session: TextWorldSession,
     args: tuple[str, ...],
 ) -> tuple[str, bool]:
     session._expect_count(args, 1, "drop <item>")
-    lowered = args[0].lower()
-    matches = [
-        item
-        for item in session.player.loadout.carried_loose
-        if item.item_id.lower() == lowered or item.name.lower() == lowered
-    ]
-    if len(matches) != 1:
-        if not matches:
-            raise ValueError(f"you are not carrying: {args[0]}")
-        raise ValueError(f"ambiguous carried item: {args[0]}")
-
-    item = matches[0]
+    item = resolve_carried_item(session, args[0])
     session.player.loadout.carried_loose.remove(item)
     position = (
         session.player.spatial.position
@@ -216,42 +251,124 @@ def open_door(
     session: TextWorldSession,
     args: tuple[str, ...],
 ) -> tuple[str, bool]:
-    session._expect_count(args, 1, "open <door>")
-    door = resolve_door(session, args[0])
-    require_door_reach(session, door)
-    door.open_door()
+    session._expect_count(args, 1, "open <object>")
+    target = resolve_openable(session, args[0])
+    if isinstance(target, Door):
+        require_door_reach(session, target)
+        target.open_door()
+    else:
+        require_container_reach(session, target)
+        target.open_container()
     session._advance_clock(0.5)
-    return f"You open {door.name}.", False
+    return f"You open {target.name}.", False
 
 
 def close_door(
     session: TextWorldSession,
     args: tuple[str, ...],
 ) -> tuple[str, bool]:
-    session._expect_count(args, 1, "close <door>")
-    door = resolve_door(session, args[0])
-    require_door_reach(session, door)
-    door.close_door()
+    session._expect_count(args, 1, "close <object>")
+    target = resolve_openable(session, args[0])
+    if isinstance(target, Door):
+        require_door_reach(session, target)
+        target.close_door()
+    else:
+        require_container_reach(session, target)
+        target.close_container()
     session._advance_clock(0.5)
-    return f"You close {door.name}.", False
+    return f"You close {target.name}.", False
 
 
 def require_door_reach(session: TextWorldSession, door: Door) -> None:
+    require_entity_reach(session, door.spatial)
+
+
+def require_container_reach(
+    session: TextWorldSession,
+    container: SceneContainer,
+) -> None:
+    require_entity_reach(session, container.spatial)
+
+
+def require_entity_reach(
+    session: TextWorldSession,
+    entity: SpatialEntity,
+) -> None:
     from .spatial import observe
 
-    distance = session.player.spatial.position.distance_to(door.position)
+    distance = session.player.spatial.position.distance_to(entity.position)
     if distance > 1.5:
         raise ValueError(
-            f"{door.name} is too far away to manipulate ({distance:.2f} m)"
+            f"{entity.name} is too far away to manipulate ({distance:.2f} m)"
         )
     observation = observe(
         session.player.spatial,
-        door.spatial,
+        entity,
         session.player.vision,
+        illumination=session.environment.illumination,
+        contrast=session.environment.contrast_multiplier,
         obstacles=session.entities,
     )
     if observation is None:
-        raise ValueError(f"you cannot currently perceive {door.name}")
+        raise ValueError(f"you cannot currently perceive {entity.name}")
+
+
+def resolve_carried_item(
+    session: TextWorldSession,
+    query: str,
+) -> PhysicalItem:
+    lowered = query.lower()
+    matches = [
+        item
+        for item in session.player.loadout.carried_loose
+        if item.item_id.lower() == lowered or item.name.lower() == lowered
+    ]
+    if len(matches) != 1:
+        if not matches:
+            raise ValueError(f"you are not carrying: {query}")
+        raise ValueError(f"ambiguous carried item: {query}")
+    return matches[0]
+
+
+def resolve_openable(
+    session: TextWorldSession,
+    query: str,
+) -> Door | SceneContainer:
+    lowered = query.lower()
+    matches: list[Door | SceneContainer] = [
+        door
+        for door in session.doors.values()
+        if door.door_id.lower() == lowered or door.name.lower() == lowered
+    ]
+    matches.extend(
+        container
+        for container in session.scene_containers.values()
+        if container.container_id.lower() == lowered
+        or container.name.lower() == lowered
+    )
+    if len(matches) != 1:
+        if not matches:
+            raise ValueError(f"unknown openable object: {query}")
+        raise ValueError(f"ambiguous openable object: {query}")
+    return matches[0]
+
+
+def resolve_scene_container(
+    session: TextWorldSession,
+    query: str,
+) -> SceneContainer:
+    lowered = query.lower()
+    matches = [
+        container
+        for container in session.scene_containers.values()
+        if container.container_id.lower() == lowered
+        or container.name.lower() == lowered
+    ]
+    if len(matches) != 1:
+        if not matches:
+            raise ValueError(f"unknown scene container: {query}")
+        raise ValueError(f"ambiguous scene container: {query}")
+    return matches[0]
 
 
 def resolve_door(session: TextWorldSession, query: str) -> Door:
